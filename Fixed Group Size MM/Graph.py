@@ -89,7 +89,6 @@ class MultivariateMicroaggregation:
                         queue.append(neighbor)
                         visited.add(neighbor)
 
-            # print("tree",tree)
             subtree_sizes = {}
 
             def compute_subtree_sizes(node):
@@ -101,7 +100,6 @@ class MultivariateMicroaggregation:
 
             compute_subtree_sizes(u)
             del subtree_sizes[u]
-            # print("subtree_sizes", subtree_sizes)
 
             # Meghatarozzuk a legnagyobb reszfa gyokeret
             largest_subtree_size = max(subtree_sizes.values())
@@ -212,32 +210,27 @@ class MultivariateMicroaggregation:
                 final_groups.append(remaining_group)
 
         self._microaggregate(final_groups)
-        return self.aggregated_result
+        return self.aggregated_result, final_groups
 
 
 def main():
     records = read_data_normalized()
-    data = [
-        [1.0, 2.0],
-        [2.0, 3.0],
-        [3.0, 4.0],
-        [5.0, 6.0],
-        [8.0, 8.0],
-        [7.0, 5.0],
-        [3.0, 3.5],
-        [6.0, 7.0],
-        [4.0, 4.5],
-        [5.5, 6.5],
-        [6.0, 11.0],
-        [54.0, 4.5],
-        [5.5, 5.5]
-    ]
     k = 40
 
     mm = MultivariateMicroaggregation(records, k)
-    result = mm.run()
+    result,groups = mm.run()
     print("len of result:", len(result))
-    print("aggregated result:", result)
+    # print("aggregated result:", result)
+    print("groups:", groups)
+
+    cluster_assignment = np.zeros(len(records), dtype=int)
+
+    # Assign cluster labels
+    for cluster_id, record_indices in enumerate(groups):
+        for record_index in record_indices:
+            cluster_assignment[record_index] = cluster_id
+
+    print("Cluster assignment array:", cluster_assignment)
 
 
 if __name__ == "__main__":

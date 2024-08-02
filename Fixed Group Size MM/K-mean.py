@@ -71,6 +71,8 @@ def kmeans_microaggregation(data, k):
     K = n // k  # Maximum number of clusters
     clusters = [data]
     global_clusters_idx = np.zeros(n, dtype=int)
+    number_of_stagnation = 0
+    cluster_length = 0
 
     while len(clusters) < K:
         print("############### Another iteration!\n")
@@ -137,6 +139,14 @@ def kmeans_microaggregation(data, k):
         clusters = best_clusters
         global_clusters_idx[best_idx1] = best_cl1
         global_clusters_idx[best_idx2] = best_cl2
+
+        # in case that there are 2 clusters that are passing the same records to each other
+        if len(clusters) == cluster_length:
+            number_of_stagnation += 1
+            if number_of_stagnation == 5:
+                break
+        else:
+            cluster_length = len(clusters)
 
     return clusters, global_clusters_idx
 

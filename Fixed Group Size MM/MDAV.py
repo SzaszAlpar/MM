@@ -67,13 +67,14 @@ def aggregate(groups):
     return result
 
 
-def append_to_closest_group(records, groups):
+def append_to_closest_group(records, groups, record_indices, indices):
     nn = records.shape[1]
     centroids = [get_centroid(group, nn) for group in groups]
-    for record in records:
+    for ind, record in enumerate(records):
         distances = [get_eucl(centroid, record) for centroid in centroids]
         closest_index = np.argmin(distances)
         groups[closest_index] = np.append(groups[closest_index], record)
+        indices[closest_index] = np.append(indices[closest_index], record_indices[ind])
     return groups
 
 
@@ -82,39 +83,54 @@ def MDAV(records, k):
     RR = len(records)
     print("Starting with {} records".format(RR))
     groups = []
+    indices = []  # To keep track of the indices
+    record_indices = np.arange(RR)  # Create an array of record indices
     while RR > 2 * k:
         centroid = get_centroid(records, nn)
 
         [r, r_ind] = get_furthest(records, centroid, nn)
         [gr, gr_ind] = get_closest_k(records, r, k)
-        print("gr_ind1", gr_ind)
         groups.append(gr.copy())
+        indices.append(record_indices[gr_ind].copy())
         records = np.delete(records, gr_ind, 0)
+        record_indices = np.delete(record_indices, gr_ind, 0)
 
         [s, s_ind] = get_furthest(records, r, nn)
         [gr2, gr_ind2] = get_closest_k(records, s, k)
-        print("gr_ind2", gr_ind2)
         groups.append(gr2.copy())
+        indices.append(record_indices[gr_ind2].copy())
         records = np.delete(records, gr_ind2, 0)
+        record_indices = np.delete(record_indices, gr_ind2, 0)
 
         RR = len(records)
         print("Remaining records, RR = ", RR)
-    print("Ungrouped records, RR = ", RR)
+
     if RR > k:
         groups.append(records.copy())
     else:
-        groups = append_to_closest_group(records, groups)
+        groups = append_to_closest_group(records, groups, record_indices, indices)
 
-    return groups
+    return groups, indices
 
 
 def main():
     records = read_data_normalized()
-    k = 40
-    groups = MDAV(records, k)
+    k = 25
+    groups, indices = MDAV(records, k)
     print("groups len:", len(groups))
+    print("indices len:", len(indices))
     print("aggregated result:", aggregate(groups))
     print("type", type(groups[0]))
+
+    # Create an array to hold the cluster assignment for each record
+    cluster_assignment = np.zeros(len(records), dtype=int)
+
+    # Assign cluster labels
+    for cluster_id, record_indices in enumerate(indices):
+        for record_index in record_indices:
+            cluster_assignment[record_index] = cluster_id
+
+    print("Cluster assignment array:", cluster_assignment)
 
 
 if __name__ == "__main__":
