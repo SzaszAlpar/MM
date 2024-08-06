@@ -4,7 +4,7 @@ from sklearn.preprocessing import StandardScaler
 
 
 def read_data_normalized():
-    df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
+    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
     df = df[
         ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
          'Daily Steps', ]]
@@ -33,38 +33,60 @@ def get_eucl(a, b):
     return np.linalg.norm(a - b)
 
 
-def get_furthest(records, vector, nn):
-    furthest = np.zeros(nn)
+def get_furthest(records, vect):
+    furthest = None
     max_distance = 0.0
     furthest_index = 0
-    index = 0
 
-    for record in records:
-        dist = get_eucl(vector, record)
+    for index, record in enumerate(records):
+        dist = get_eucl(vect, record)
         if dist > max_distance:
             furthest = record
             max_distance = dist
             furthest_index = index
-        index += 1
 
     return [furthest, furthest_index]
+
+
+def get_closest_from_vector(records, vector):
+    closest = None
+    closest_index = 0
+    min_distance = float('inf')
+
+    for index, record in enumerate(records):
+        dist = get_eucl(vector, record)
+        if dist < min_distance:
+            closest = record
+            min_distance = dist
+            closest_index = index
+
+    return [closest, closest_index, min_distance]
+
+
+def get_closest_from_group(formed_group, remaining_records):
+    distance_list = []
+
+    for index, gr_record in enumerate(remaining_records):
+        distances = [get_eucl(vec, gr_record) for vec in formed_group]
+        shortest_distance = min(distances)
+        distance_list.append(shortest_distance)
+
+    distance_list = np.array(distance_list)
+    closest_index = np.argmin(distance_list, axis=0)
+    min_distance = distance_list[closest_index]
+    closest = remaining_records[closest_index]
+
+    return [closest, closest_index, min_distance]
 
 
 def get_closest_k(records, vec, k):
     group_distances = np.array([get_eucl(rec, vec) for rec in records])
     group_indexes = np.array(range(0, len(records)))
     argsort = group_distances.argsort()
-    records = records[argsort]
+    records_cpy = records.copy()
+    records_cpy = records_cpy[argsort]
     group_indexes = group_indexes[argsort]
-    return [records[0:k], group_indexes[0:k]]
-
-
-def aggregate(groups):
-    result = []
-    nn = len(groups[0][0])
-    for group in groups:
-        result.append(get_centroid(group, nn))
-    return result
+    return [records_cpy[0:k], group_indexes[0:k]]
 
 
 def append_to_closest_group(records, groups, record_indices, indices):
@@ -73,34 +95,52 @@ def append_to_closest_group(records, groups, record_indices, indices):
     for ind, record in enumerate(records):
         distances = [get_eucl(centroid, record) for centroid in centroids]
         closest_index = np.argmin(distances)
-        groups[closest_index] = np.append(groups[closest_index], record)
+        groups[closest_index] = np.vstack([groups[closest_index], record])
         indices[closest_index] = np.append(indices[closest_index], record_indices[ind])
     return groups
 
 
-def MDAV(records, k):
+def should_add_record(d_in, d_out, gamma=0.2):
+    return d_in <= d_out * gamma
+
+
+def V_MDAV(records, k):
     nn = len(records[0])
     RR = len(records)
     print("Starting with {} records".format(RR))
     groups = []
-    indices = []  # To keep track of the indices
-    record_indices = np.arange(RR)  # Create an array of record indices
-    while RR > 2 * k:
-        centroid = get_centroid(records, nn)
+    indices = []
+    record_indices = np.arange(RR)
+    centroid = get_centroid(records, nn)
 
-        [r, r_ind] = get_furthest(records, centroid, nn)
+    while RR > k - 1:
+        [r, r_ind] = get_furthest(records, centroid)
+
         [gr, gr_ind] = get_closest_k(records, r, k)
         groups.append(gr.copy())
         indices.append(record_indices[gr_ind].copy())
         records = np.delete(records, gr_ind, 0)
         record_indices = np.delete(record_indices, gr_ind, 0)
 
-        [s, s_ind] = get_furthest(records, r, nn)
-        [gr2, gr_ind2] = get_closest_k(records, s, k)
-        groups.append(gr2.copy())
-        indices.append(record_indices[gr_ind2].copy())
-        records = np.delete(records, gr_ind2, 0)
-        record_indices = np.delete(record_indices, gr_ind2, 0)
+        # extend this group if there are very close records
+        e_in, e_in_index, d_in = get_closest_from_group(gr, records)
+        e_out, e_out_index, d_out = get_closest_from_vector(records, e_in)
+        gr_extension = []
+        gr_extension_indexes = []
+        # while there are records that are closer to this group than to the unassigned records
+        while should_add_record(d_in, d_out):
+            gr_extension.append(e_in.copy())
+            gr_extension_indexes.append(record_indices[e_in_index].copy())
+            records = np.delete(records, e_in_index, 0)
+            record_indices = np.delete(record_indices, e_in_index, 0)
+
+            e_in, e_in_index, d_in = get_closest_from_group(gr, records)
+            e_out, e_out_index, d_out = get_closest_from_vector(records, e_in)
+
+        if len(gr_extension) > 0:
+            idx = len(groups) - 1
+            groups[idx] = np.vstack([groups[idx], np.array(gr_extension)])
+            indices[idx] = np.append(indices[idx], np.array(gr_extension_indexes), axis=0)
 
         RR = len(records)
         print("Remaining records, RR = ", RR)
@@ -115,11 +155,10 @@ def MDAV(records, k):
 
 def main():
     records = read_data_normalized()
-    k = 25
-    groups, indices = MDAV(records, k)
+    k = 12
+    groups, indices = V_MDAV(records, k)
     print("groups len:", len(groups))
     print("indices len:", len(indices))
-    print("aggregated result:", aggregate(groups))
     print("type", type(groups[0]))
 
     # Create an array to hold the cluster assignment for each record

@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import seaborn as sns
 
-
 class Interpreter:
     def __init__(self, groups, centroids, scalers):
         self.groups = groups

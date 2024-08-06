@@ -2,11 +2,11 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-import ResultInterpreter
+from FixedGroupSizeMM import ResultInterpreter
 
 
 def read_data_normalized():
-    df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
+    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
     df2 = df[
         ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
 
