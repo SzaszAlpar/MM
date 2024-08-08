@@ -116,12 +116,14 @@ def MDAV(records, k):
 
 def main():
     records = read_data_normalized()
-    k = 35
+    k = 31
     groups, indices = MDAV(records, k)
     print("groups len:", len(groups))
     print("indices len:", len(indices))
     print("aggregated result:", aggregate(groups))
     print("type", type(groups[0]))
+    for group in groups:
+        print("group len:", len(group))
 
     # Create an array to hold the cluster assignment for each record
     cluster_assignment = np.zeros(len(records), dtype=int)

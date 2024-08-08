@@ -2,11 +2,11 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import random
-import ResultInterpreter
+from FixedGroupSizeMM import ResultInterpreter
 
 
 def read_data_normalized():
-    df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
+    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
     df2 = df[
         ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
     column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
@@ -21,21 +21,28 @@ def read_data_normalized():
     return [df2, scalers, df.fillna(0).to_numpy()]
 
 
-def initialize_solution(n, k):
-    cluster_numbers = n // k
+def initialize_solution(n, k_min, k_max):
     solution = np.zeros(n, dtype=int)
-    cluster_sizes = [k] * (cluster_numbers)
+    cluster_id = 1
+    indices = np.arange(n)
+    np.random.shuffle(indices)
 
-    # the remaining records will be added to a random group
-    cluster_sizes[random.choice(range(n // k))] += n % k
+    start_idx = 0
+    while start_idx < n:
+        remaining_points = n - start_idx
+        current_k_max = min(k_max, remaining_points)
+        current_k_min = min(k_min, remaining_points)
 
-    current_idx = 0
-    for cluster_id in range(1, cluster_numbers + 1):
-        for _ in range(cluster_sizes[cluster_id - 1]):
-            solution[current_idx] = cluster_id
-            current_idx += 1
+        if remaining_points <= k_max:
+            cluster_size = remaining_points
+        else:
+            cluster_size = random.randint(current_k_min, current_k_max)
 
-    np.random.shuffle(solution)
+        end_idx = start_idx + cluster_size
+        solution[indices[start_idx:end_idx]] = cluster_id
+        cluster_id += 1
+        start_idx = end_idx
+
     return solution
 
 
@@ -46,9 +53,10 @@ def generate_neighbor(solution):
     return neighbor
 
 
-def calculate_energy(solution, data, num_clusters):
+def calculate_energy(solution, data):
+    unique_clusters = np.unique(solution)
     energy = 0
-    for cluster_id in range(1, num_clusters + 1):
+    for cluster_id in unique_clusters:
         cluster_points = data[np.where(solution == cluster_id)]
         if len(cluster_points) > 0:
             mean = np.mean(cluster_points, axis=0)
@@ -56,41 +64,9 @@ def calculate_energy(solution, data, num_clusters):
     return energy
 
 
-def simulated_annealing(data, num_clusters, initial_temperature, cooling_rate, max_iterations, min_energy_threshold):
-    n = len(data)
-    current_solution = initialize_solution(n, num_clusters)
-    print("initial solution: ", current_solution)
-    current_energy = calculate_energy(current_solution, data, num_clusters)
-    print("initial energy ", current_energy)
-    best_solution = current_solution.copy()
-    best_energy = current_energy
-
-    temperature = initial_temperature
-
-    for iteration in range(max_iterations):
-        if current_energy < min_energy_threshold:
-            break
-        neighbor_solution = generate_neighbor(current_solution)
-        neighbor_energy = calculate_energy(neighbor_solution, data, num_clusters)
-
-        if neighbor_energy < current_energy or random.random() < np.exp(
-                (current_energy - neighbor_energy) / temperature):
-            current_solution = neighbor_solution
-            current_energy = neighbor_energy
-
-        if current_energy < best_energy:
-            best_solution = current_solution.copy()
-            best_energy = current_energy
-
-        temperature *= cooling_rate
-
-    return best_solution, best_energy
-
-
 def perturb_solution(solution):
-    # Perturb the solution by reassigning some points randomly to different clusters
     perturbed_solution = solution.copy()
-    num_perturbations = len(solution) // 10  # Change 10% of the points
+    num_perturbations = len(solution) // 10
     indices_to_perturb = random.sample(range(len(solution)), num_perturbations)
     indices_to_swap_with = random.sample(range(len(solution)), num_perturbations)
     for count, idx in enumerate(indices_to_perturb):
@@ -101,12 +77,11 @@ def perturb_solution(solution):
     return perturbed_solution
 
 
-def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterations, min_energy_threshold,
+def simulated_annealing2(data, k_min, k_max, initial_temperature, cooling_rate, max_iterations, min_energy_threshold,
                          max_stagnation_iterations):
     n = len(data)
-    num_clusters = n // k
-    current_solution = initialize_solution(n, k)
-    current_energy = calculate_energy(current_solution, data, num_clusters)
+    current_solution = initialize_solution(n, k_min, k_max)
+    current_energy = calculate_energy(current_solution, data)
 
     best_solution = current_solution.copy()
     best_energy = current_energy
@@ -119,7 +94,7 @@ def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterati
             break
 
         neighbor_solution = generate_neighbor(current_solution)
-        neighbor_energy = calculate_energy(neighbor_solution, data, num_clusters)
+        neighbor_energy = calculate_energy(neighbor_solution, data)
 
         if neighbor_energy < current_energy or random.random() < np.exp(
                 (current_energy - neighbor_energy) / temperature):
@@ -135,7 +110,7 @@ def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterati
 
         if stagnation_counter > max_stagnation_iterations:
             current_solution = perturb_solution(best_solution)
-            current_energy = calculate_energy(current_solution, data, num_clusters)
+            current_energy = calculate_energy(current_solution, data)
             stagnation_counter = 0  # Reset stagnation counter after perturbation
 
         temperature *= cooling_rate
@@ -146,20 +121,20 @@ def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterati
 def main():
     pd.options.mode.chained_assignment = None  # default='warn'
     [records, sc, full_data] = read_data_normalized()
-    k = 40
+    k_min = 20
+    k_max = 60
     initial_temperature = 1000
     cooling_rate = 0.99
     max_iterations = 2000
     min_energy_threshold = 1e-5  # Minimum energy threshold to avoid getting stuck
     max_stagnation_iterations = 100  # Maximum iterations without significant improvement
 
-    best_solution, best_energy = simulated_annealing2(records, k, initial_temperature, cooling_rate,
+    best_solution, best_energy = simulated_annealing2(records, k_min, k_max, initial_temperature, cooling_rate,
                                                       max_iterations, min_energy_threshold, max_stagnation_iterations)
 
     print("Best Solution:", best_solution)
     print("Best Energy:", best_energy)
     interpret_result(best_solution, full_data, records, sc)
-
 
 
 def interpret_result(best_solution, full_data, records, sc):
@@ -173,6 +148,7 @@ def interpret_result(best_solution, full_data, records, sc):
     RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
     RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
     RI.calculate_homogeneity()
+
 
 if __name__ == "__main__":
     main()

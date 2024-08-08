@@ -2,11 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-import ResultInterpreter
+from FixedGroupSizeMM import ResultInterpreter
 
 
 def read_data_normalized():
-    df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
+    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
     df2 = df[
         ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
     column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
@@ -32,29 +32,6 @@ def fitness_function(centroids, data, k):
     return quantization_error
 
 
-def assign_data_to_clusters(data, centroids, k):
-    n = data.shape[0]
-    assignments = -1 * np.ones(n, dtype=int)
-    distances = np.linalg.norm(data[:, None] - centroids, axis=2)
-    assigned_indices = set()
-
-    for cluster_index in range(len(centroids)):
-        closest_indices = np.argsort(distances[:, cluster_index])
-        j = 0
-        for idx in closest_indices:
-            if idx not in assigned_indices:
-                assignments[idx] = cluster_index
-                assigned_indices.add(idx)
-                j += 1
-            if j == k:
-                break
-
-    remaining_indices = np.where(assignments == -1)[0]
-    assignments[remaining_indices] = len(centroids) - 1
-
-    return assignments
-
-
 def reassign_points(assignments, centroids, k):
     while True:
         # if any cluster is smaller than k, we reassign the clusters
@@ -71,6 +48,37 @@ def reassign_points(assignments, centroids, k):
             cluster_sizes = np.bincount(assignments, minlength=len(centroids))
     return assignments
 
+
+def assign_data_to_clusters(data, centroids, k):
+    distances = np.linalg.norm(data[:, np.newaxis] - centroids, axis=2)
+    assignments = np.argmin(distances, axis=1)
+    cluster_sizes = np.bincount(assignments, minlength=len(centroids))
+
+    for cluster_index in range(len(centroids)):
+        if cluster_sizes[cluster_index] < k:
+            needed_points = k - cluster_sizes[cluster_index]
+
+            centroid_distances = np.linalg.norm(centroids - centroids[cluster_index], axis=1)
+            sorted_cluster_indices = np.argsort(centroid_distances)
+
+            for other_cluster in sorted_cluster_indices:
+                if cluster_index == other_cluster:
+                    continue
+
+                excess_points = cluster_sizes[other_cluster] - k
+                if excess_points > 0:
+                    # A szomszed klaszter legkulsobb tagjait valasztjuk le
+                    candidates = np.where(assignments == other_cluster)[0]
+                    sorted_candidates = np.argsort(distances[candidates, other_cluster])[::-1]
+                    move_indices = candidates[sorted_candidates[:excess_points]]
+
+                    assignments[move_indices] = cluster_index
+                    cluster_sizes[cluster_index] += len(move_indices)
+                    cluster_sizes[other_cluster] -= len(move_indices)
+                    needed_points -= len(move_indices)
+                    if needed_points <= 0:
+                        break
+    return assignments
 
 def get_centroid(records, nn):
     record_number = len(records)
@@ -141,8 +149,8 @@ def main():
 
     print("gbest value:", gBest_value)
     print("gbest :", gBest)
-
     group_assignments = assign_data_to_clusters(data, gBest, k)
+    print("group_assignments:", group_assignments)
     print("group_assignments:", group_assignments)
 
     colors = group_assignments
@@ -159,8 +167,8 @@ def main2():
     pd.options.mode.chained_assignment = None  # default='warn'
     [records, sc, full_data] = read_data_normalized()
     num_particles = 200
-    k = 40
-    max_iterations = 10
+    k = 25
+    max_iterations = 152
     w = 0.5  # Inertia weight
     c1 = 1.5  # Cognitive constant
     c2 = 1.5  # Social constant
@@ -188,4 +196,4 @@ def interpret_result(best_solution, full_data, records, sc):
 
 
 if __name__ == "__main__":
-    main()
+    main2()
