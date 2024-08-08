@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from collections import defaultdict
 import GA
+import ResultInterpreter
 
 
 def read_data_normalized():
@@ -52,8 +53,10 @@ def main():
         for small_group in indices_grouped:
             for small_group_idx in small_group:
                 final_assignments[indices[i][small_group_idx]] = idx
-        idx += 1
+            idx += 1
     print("final assignments", final_assignments)
+    ResultInterpreter.plot_some_results(final_assignments)
+
 
 if __name__ == "__main__":
     main()

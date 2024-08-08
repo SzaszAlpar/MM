@@ -106,3 +106,19 @@ def get_groups(data, best_result):
         group_data = data[best_result == group]
         groups.append(group_data)
     return groups
+
+def get_full_data():
+    df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
+    df2 = df[
+        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Daily Steps']]
+
+    return df2
+
+def plot_some_results(labels):
+    df = get_full_data()
+    n = len(df)
+    df['Cluster'] = labels
+    custom_palette = sns.color_palette("husl", n_colors=len(np.unique(labels)))
+    # sns.pairplot(df, hue='Cluster',palette=custom_palette)
+    sns.pairplot(df,kind='reg', hue='Cluster',palette=custom_palette,diag_kind='kde')
+    plt.show()

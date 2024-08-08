@@ -190,7 +190,7 @@ def kmeans_microaggregation(data, k):
 def main():
     pd.options.mode.chained_assignment = None  # default='warn'
     [records, sc, full_data] = read_data_normalized()
-    k = 25
+    k = 100
     n_clusters = len(records) // k
     print("Maximum number of clusters: ", n_clusters)
 
@@ -199,6 +199,8 @@ def main():
 
     for i, gr in enumerate(groups):
         print(i, ". group size: ", len(gr))
+
+    ResultInterpreter.plot_some_results(result_idx)
 
     centroids = aggregate(groups)
     print("centroids:", centroids)
