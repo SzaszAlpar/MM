@@ -63,7 +63,9 @@ def select_in_elite_mode(population, fitnesses, number_of_chromosomes):
     selected_fit = [fitnesses[i] for i in selected_indices]
 
     # sort by fitness value
-    selected_pop = [x for _, x in sorted(zip(selected_fit, selected_pop))]
+    # selected_pop = [x for _, x in sorted(zip(selected_fit, selected_pop))]
+    selected_pop = [x for _, x in sorted(zip(selected_fit, selected_pop), key=lambda pair: pair[0].sum())]
+
     return selected_pop
 
 
@@ -172,7 +174,7 @@ def genetic_algorithm(records, n_clusters, generations, k, population_size):
     best_fitness = float('inf')
 
     for generation in range(generations):
-        print(generation, ". generation:")
+        # print(generation, ". generation:")
         fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
 
         if min(fitnesses) < best_fitness:
@@ -193,7 +195,7 @@ def genetic_algorithm(records, n_clusters, generations, k, population_size):
         new_fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
         population = select_in_elite_mode(population, new_fitnesses, population_size)
 
-        print("Current best fitness:", best_fitness)
+        # print("Current best fitness:", best_fitness)
 
     return best_solution, best_fitness
 
@@ -201,9 +203,9 @@ def genetic_algorithm(records, n_clusters, generations, k, population_size):
 def main():
     pd.options.mode.chained_assignment = None
     [records, sc, full_data] = read_data_normalized()
-    k = 25
+    k = 10
     population_zise = 76
-    generations = 234
+    generations = 10
     n_clusters = len(records) // k
 
     best_solution, best_fitness = genetic_algorithm(records, n_clusters, generations, k, population_zise)

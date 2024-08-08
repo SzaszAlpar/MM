@@ -108,6 +108,7 @@ def MDAV(records, k):
 
     if RR > k:
         groups.append(records.copy())
+        indices.append(record_indices.copy())
     else:
         groups = append_to_closest_group(records, groups, record_indices, indices)
 
@@ -116,7 +117,7 @@ def MDAV(records, k):
 
 def main():
     records = read_data_normalized()
-    k = 31
+    k = 50
     groups, indices = MDAV(records, k)
     print("groups len:", len(groups))
     print("indices len:", len(indices))
