@@ -4,7 +4,6 @@ from sklearn.preprocessing import StandardScaler
 from scipy.spatial.distance import euclidean
 from collections import defaultdict, deque
 from scipy.spatial import distance_matrix
-from FixedGroupSizeMM import readCensus
 
 
 def read_data_normalized():
@@ -268,33 +267,6 @@ def main2():
     print("adjency", adjacency_list)
 
 
-def main3():
-    pd.options.mode.chained_assignment = None  # default='warn'
-    records = readCensus.read_census()
-    print("len records", len(records))
-    k = 2133
-    n = len(records)
-    adjacency_list = defaultdict(list)
-    parents = [-1] * n
-    dm = np.memmap('../FixedGroupSizeMM/distance_matrix.dat', dtype='float32', mode='r', shape=(n, n))
-
-    groups = run(records, n, k, adjacency_list, parents, dm)
-    for group in groups:
-        print("gr len:", len(group))
-
-    cluster_assignment = np.zeros(len(records), dtype=int)
-
-    # Assign cluster labels
-    for cluster_id, record_indices in enumerate(groups):
-        for record_index in record_indices:
-            cluster_assignment[record_index] = cluster_id
-
-    print("Cluster assignment array, saving it to the disk!:", cluster_assignment)
-    print("shape:", cluster_assignment.shape)
-    memmap_array = np.memmap('large_array.dat', dtype='float32', mode='w+', shape=(n,))
-    np.copyto(memmap_array, cluster_assignment)
-    memmap_array.flush()
-
 
 if __name__ == "__main__":
-    main3()
+    main()
