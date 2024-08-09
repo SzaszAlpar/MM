@@ -121,6 +121,8 @@ def V_MDAV(records, k):
         indices.append(record_indices[gr_ind].copy())
         records = np.delete(records, gr_ind, 0)
         record_indices = np.delete(record_indices, gr_ind, 0)
+        if len(records) == 0:
+            break
 
         # extend this group if there are very close records
         e_in, e_in_index, d_in = get_closest_from_group(gr, records)

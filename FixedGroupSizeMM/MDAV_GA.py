@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from collections import defaultdict
-from scipy.spatial import distance_matrix
-import Graphh
+import GA
+import ResultInterpreter
 
 
 def read_data_normalized():
@@ -24,34 +24,35 @@ def read_data_normalized():
     return df
 
 
-def main():
-    records = read_data_normalized()
+def MDAV_GA(records, k1, k2, population_zise, generations):
     n = len(records)
-    k = 50
-    k2 = 10
     final_assignments = -1 * np.ones(n, dtype=int)
-    groups, indices = MDAV.MDAV(records, k)
+    groups, indices = MDAV.MDAV(records, k1)
 
     idx = 0
-
     for i, group in enumerate(groups):
-        print(i, ". th group from MDAV has ", len(group), " samples. Call GRAPH on it, k=", k2)
-        n2 = len(group)
-        adjacency_list = defaultdict(list)
-        parents = [-1] * n2
-        dm = distance_matrix(group, group)
+        print(i, ". th group from MDAV has ", len(group), " samples. Call GA on it, k=", k2)
+        n_clusters = len(group) // k2
 
-        indices_grouped = Graphh.run(group, n2, k2, adjacency_list, parents, dm)
+        best_solution, best_fitness = GA.genetic_algorithm(group, n_clusters, generations, k2, population_zise)
+        indices_dict = defaultdict(list)
+        for index, value in enumerate(best_solution):
+            indices_dict[value].append(index)
+        indices_grouped = [indices_dict[key] for key in sorted(indices_dict.keys())]
+
         small_group_sizes = [len(small_group) for small_group in indices_grouped]
         print("Graph resulted in ", len(indices_grouped), " smaller groups. Here are the sizes:", small_group_sizes)
 
         for small_group in indices_grouped:
             for small_group_idx in small_group:
-                # print("sm", (indices[0][0]))
-                # print("i", (i))
                 final_assignments[indices[i][small_group_idx]] = idx
-        idx += 1
+            idx += 1
     print("final assignments", final_assignments)
+    return final_assignments
+
 
 if __name__ == "__main__":
-    main()
+    records = read_data_normalized()
+    generations = 300
+    population_size = 60
+    fa = MDAV_GA(records, 50, 4, population_size, generations)
