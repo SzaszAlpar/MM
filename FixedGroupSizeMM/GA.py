@@ -3,6 +3,8 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import random
 import ResultInterpreter
+import calculate_inf_loss, SA
+import time
 
 
 def read_data_normalized():
@@ -21,9 +23,10 @@ def read_data_normalized():
     return [df2, scalers, df.fillna(0).to_numpy()]
 
 
-def initialize_population(size, chromosome_length, n_clusters, k):
+def initialize_population(size, chromosome_length, n_clusters, k, records):
     population = []
-    for _ in range(size):
+    for i in range(size):
+        np.random.seed(int(time.time()) + i)
         chromosome = np.zeros(chromosome_length, dtype=int)
 
         # Assign each cluster number k times
@@ -37,9 +40,26 @@ def initialize_population(size, chromosome_length, n_clusters, k):
             chosen_cluster = np.random.randint(0, n_clusters)
             chromosome[remaining_indices] = chosen_cluster
 
+        print("chromosome fitness:", fitness(chromosome, records, n_clusters))
         population.append(chromosome)
 
     return population
+
+
+def initialize_population_and_adjust_with_SA(size, chromosome_length, n_clusters, k, records):
+    pop = initialize_population(size, chromosome_length, n_clusters, k, records)
+    initial_temperature = 100
+    cooling_rate = 0.85
+    max_iterations = 400
+    min_energy_threshold = 1e-5
+    max_stagnation_iterations = 25
+    new_pop = []
+    for ch in pop:
+        new_ch, fitness = SA.simulated_annealing22(records, k, initial_temperature, cooling_rate, max_iterations,
+                                                   min_energy_threshold, max_stagnation_iterations, ch)
+        print("fitness", fitness)
+        new_pop.append(new_ch)
+    return new_pop
 
 
 def fitness(chromosome, data, n_clusters):
@@ -53,32 +73,31 @@ def fitness(chromosome, data, n_clusters):
     return sse
 
 
-def select_in_elite_mode(population, fitnesses, number_of_chromosomes):
-    # Convert fitnesses to probabilities for selection (inverse since lower fitness is better)
-    probabilities = 1 / np.array(fitnesses)
-    # normalizing it so the sum became 1
-    probabilities /= probabilities.sum()
-    selected_indices = np.random.choice(len(population), size=number_of_chromosomes, p=probabilities)
-    selected_pop = [population[i] for i in selected_indices]
-    selected_fit = [fitnesses[i] for i in selected_indices]
+def elitism_selection(population, fitnesses, number_of_chromosomes):
+    paired = list(zip(fitnesses, population))
+    # Sort the population by fitness
+    paired.sort(key=lambda x: x[0])
+    selected_pop = [ind for _, ind in paired[:number_of_chromosomes]]
+    return selected_pop
 
-    # sort by fitness value
-    # selected_pop = [x for _, x in sorted(zip(selected_fit, selected_pop))]
-    selected_pop = [x for _, x in sorted(zip(selected_fit, selected_pop), key=lambda pair: pair[0].sum())]
+
+def tournament_selection(population, fitnesses, number_of_chromosomes, tournament_size=3):
+    selected_pop = []
+
+    for _ in range(number_of_chromosomes):
+        # Randomly select individuals for the tournament
+        tournament_indices = random.sample(range(len(population)), tournament_size)
+        tournament_pop = [population[i] for i in tournament_indices]
+        tournament_fitnesses = [fitnesses[i] for i in tournament_indices]
+
+        # Choose the best individual from the tournament
+        best_index = np.argmin(tournament_fitnesses)
+        selected_pop.append(tournament_pop[best_index])
 
     return selected_pop
 
 
-def crossover(parent1, parent2, crossover_rate=0.80):
-    if random.random() < crossover_rate:
-        point = random.randint(1, len(parent1) - 2)
-        child1 = np.concatenate((parent1[:point], parent2[point:]))
-        child2 = np.concatenate((parent2[:point], parent1[point:]))
-        return child1, child2
-    return parent1, parent2
-
-
-def uniform_crossover(parent1, parent2, k, crossover_rate=0.80, parent_rate=0.5):
+def uniform_crossover(parent1, parent2, k, crossover_rate=0.90, parent_rate=0.5):
     if random.random() < crossover_rate:
         child1 = []
         child2 = []
@@ -133,6 +152,7 @@ def rearrange_chromosome(chromosome, k):
     return chromosome
 
 
+# only one cluster should have size bigger than k
 def rearrange_chromosome2(chromosome, k, cluster_counts, big_clusters):
     if len(big_clusters) > 1:
         chosen_cluster = random.choice(big_clusters)
@@ -148,7 +168,7 @@ def rearrange_chromosome2(chromosome, k, cluster_counts, big_clusters):
     return chromosome
 
 
-def mutate(chromosome, mutation_rate=0.1):
+def mutate(chromosome, mutation_rate=0.01):
     for i in range(len(chromosome)):
         if random.random() < mutation_rate:
             rand_index = random.randint(0, chromosome.size - 1)
@@ -167,22 +187,46 @@ def get_parent_number(population, parent_rate=0.60):
         return number
 
 
+def shuffle_top_population(population, fitnesses, shuffle_percentage):
+    paired = list(zip(fitnesses, population))
+    paired.sort(key=lambda x: x[0])
+
+    sorted_population = [ind for _, ind in paired[:]]
+    num_to_shuffle = int(len(sorted_population) * shuffle_percentage)
+    for idx in range(num_to_shuffle):
+        np.random.shuffle(sorted_population[idx])
+
+    return sorted_population
+
+
 def genetic_algorithm(records, n_clusters, generations, k, population_size):
     n_samples = records.shape[0]
-    population = initialize_population(population_size, n_samples, n_clusters, k)
-    best_solution = None
-    best_fitness = float('inf')
+    max_stagnation = 30
+    shuffle_percentage = 0.5
+    population = initialize_population_and_adjust_with_SA(population_size, n_samples, n_clusters, k, records)
+    fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
+    best_solution = population[np.argmin(fitnesses)]
+    best_fitness = min(fitnesses)
+    stagnation_count = 0
 
     for generation in range(generations):
-        # print(generation, ". generation:")
+        print(generation, ". generation:")
         fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
 
         if min(fitnesses) < best_fitness:
             best_fitness = min(fitnesses)
             best_solution = population[np.argmin(fitnesses)]
+            stagnation_count = 0
+        else:
+            stagnation_count += 1
+
+        if stagnation_count >= max_stagnation:
+            fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
+            population = shuffle_top_population(population, fitnesses, shuffle_percentage)
+            stagnation_count = 0
         parent_number = get_parent_number(population_size)
         # select best parents to crossover
-        parents = select_in_elite_mode(population, fitnesses, parent_number)
+        parents = tournament_selection(population, fitnesses, parent_number)
         offspring = []
 
         for i in range(0, parent_number, 2):
@@ -193,26 +237,32 @@ def genetic_algorithm(records, n_clusters, generations, k, population_size):
 
         population.extend(offspring)
         new_fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
-        population = select_in_elite_mode(population, new_fitnesses, population_size)
+        population = tournament_selection(population, new_fitnesses, population_size)
+        population.append(best_solution)
 
-        # print("Current best fitness:", best_fitness)
+        print("Current best fitness:", best_fitness)
 
     return best_solution, best_fitness
 
 
 def main():
     pd.options.mode.chained_assignment = None
-    [records, sc, full_data] = read_data_normalized()
-    k = 10
-    population_zise = 76
-    generations = 10
+    # [records, sc, full_data] = read_data_normalized()
+    dataset_Census = '../Datasets/Census.csv'
+    records = calculate_inf_loss.read_dataset(dataset_Census)
+    k = 3
+    population_zise = 10
+    generations = 100
     n_clusters = len(records) // k
 
     best_solution, best_fitness = genetic_algorithm(records, n_clusters, generations, k, population_zise)
-    print("Best Solution:", best_solution)
+    # print("Best Solution:", best_solution)
     print("Best Fitness (SSE):", best_fitness)
 
-    interpret_result(best_solution, full_data, records, sc)
+    # interpret_result(best_solution, full_data, records, sc)
+    overall_mean = np.mean(records, axis=0)
+    SST = np.sum((records - overall_mean) ** 2)
+    print("I= ", (best_fitness / SST) * 100)
 
 
 def interpret_result(best_solution, full_data, records, sc):

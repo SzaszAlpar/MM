@@ -47,14 +47,14 @@ def generate_neighbor(solution):
 
 
 def calculate_energy(solution, data, num_clusters):
-    energy = 0
-    for cluster_id in range(1, num_clusters + 1):
-        cluster_points = data[np.where(solution == cluster_id)]
-        if len(cluster_points) > 0:
-            mean = np.mean(cluster_points, axis=0)
-            energy += np.sum((cluster_points - mean) ** 2)
-    return energy
-
+    sse = 0
+    for i in range(num_clusters):
+        # we want to get all data points assigned to cluster i
+        cluster = data[solution == i]
+        if len(cluster) > 0:
+            centroid = cluster.mean(axis=0)
+            sse += np.sum((cluster - centroid) ** 2)
+    return sse
 
 def simulated_annealing(data, num_clusters, initial_temperature, cooling_rate, max_iterations, min_energy_threshold):
     n = len(data)
@@ -106,6 +106,47 @@ def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterati
     n = len(data)
     num_clusters = n // k
     current_solution = initialize_solution(n, k)
+    current_energy = calculate_energy(current_solution, data, num_clusters)
+
+    best_solution = current_solution.copy()
+    best_energy = current_energy
+
+    temperature = initial_temperature
+    stagnation_counter = 0
+
+    for iteration in range(max_iterations):
+        if current_energy < min_energy_threshold:
+            break
+
+        neighbor_solution = generate_neighbor(current_solution)
+        neighbor_energy = calculate_energy(neighbor_solution, data, num_clusters)
+
+        if neighbor_energy < current_energy or random.random() < np.exp(
+                (current_energy - neighbor_energy) / temperature):
+            current_solution = neighbor_solution
+            current_energy = neighbor_energy
+
+        if current_energy < best_energy:
+            best_solution = current_solution.copy()
+            best_energy = current_energy
+            stagnation_counter = 0  # Reset stagnation counter
+        else:
+            stagnation_counter += 1
+
+        if stagnation_counter > max_stagnation_iterations:
+            current_solution = perturb_solution(best_solution)
+            current_energy = calculate_energy(current_solution, data, num_clusters)
+            stagnation_counter = 0  # Reset stagnation counter after perturbation
+
+        temperature *= cooling_rate
+
+    return best_solution, best_energy
+
+
+def simulated_annealing22(data, k, initial_temperature, cooling_rate, max_iterations, min_energy_threshold,
+                         max_stagnation_iterations, current_solution):
+    n = len(data)
+    num_clusters = n // k
     current_energy = calculate_energy(current_solution, data, num_clusters)
 
     best_solution = current_solution.copy()

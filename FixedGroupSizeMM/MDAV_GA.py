@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from collections import defaultdict
 import GA
-import ResultInterpreter
+import calculate_inf_loss
 
 
 def read_data_normalized():
@@ -52,7 +52,9 @@ def MDAV_GA(records, k1, k2, population_zise, generations):
 
 
 if __name__ == "__main__":
-    records = read_data_normalized()
-    generations = 300
-    population_size = 60
-    fa = MDAV_GA(records, 50, 4, population_size, generations)
+    dataset_Census = '../Datasets/Census.csv'
+    records = calculate_inf_loss.read_dataset(dataset_Census)
+    generations = 220
+    population_size = 20
+    fa = MDAV_GA(records, 21, 3, population_size, generations)
+    calculate_inf_loss.calculate_I_loss(records,fa)
