@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-import MDAV, Kmean, GA, SA, PSO, MDAV_GA
+from FixedGroupSizeMM import MDAV, Kmean, GA, SA, PSO, MDAV_GA
 from VariableGroupSizeMM import VMDAV, VKmean, GA2, SA2, PSO2, Graphh, MDAV_graph
 import sys
 import os
@@ -41,6 +41,7 @@ def read_dataset(path):
         scalers[column] = scaler
     df = df.fillna(0).to_numpy()
     return df
+
 
 def run_MDAV(kx, records):
     for k in kx:
@@ -103,7 +104,7 @@ def run_VKMean(kx, records):
 def run_GA(kx, records):
     for k in kx:
         suppress_output()
-        population_zise = 50
+        population_zise = 10
         generations = 100
         n_clusters = len(records) // k
 
@@ -174,8 +175,8 @@ def run_VSA(kx, records):
 
 
 def run_PSO(kx, records):
-    num_particles = 15
-    max_iterations = 100
+    num_particles = 7
+    max_iterations = 150
     w = 0.5
     c1 = 1.5
     c2 = 1.5
@@ -191,7 +192,7 @@ def run_PSO(kx, records):
 
 
 def run_VPSO(kx, records):
-    num_particles = 15
+    num_particles = 10
     max_iterations = 100
     w = 0.5
     c1 = 1.5
@@ -232,7 +233,7 @@ def run_GRAPH(kx, records):
 def run_MDAV_GRAPH(kx, records):
     for k in kx:
         suppress_output()
-        cluster_assignment = MDAV_graph.MDAV_Graph(records, 50, k)
+        cluster_assignment = MDAV_graph.MDAV_Graph(records, 60, k)
         restore_output()
 
         print("MDAV+GRAPH, k=", k)
@@ -243,9 +244,9 @@ def run_MDAV_GRAPH(kx, records):
 def run_MDAV_GA(kx, records):
     for k in kx:
         suppress_output()
-        population_size = 100
-        generations = 100
-        cluster_assignment = MDAV_GA.MDAV_GA(records, 30, k, population_size, generations)
+        population_size = 10
+        generations = 1000
+        cluster_assignment = MDAV_GA.MDAV_GA(records, 90, k, population_size, generations)
         restore_output()
 
         print("MDAV+GA, k=", k)
@@ -273,22 +274,46 @@ def calculate_I_loss(data, result):
     print("\n")
 
 
-if __name__ == "__main__":
-    dataset_barcelona = '../Datasets/barcelona.csv'
-    dataset_CASCrefmicrodata = '../Datasets/CASCrefmicrodata.csv'
-    # records = read_dataset_wo_header(dataset_barcelona)
-    records = read_dataset(dataset_CASCrefmicrodata)
-    k = [3, 4, 5, 6]
-    run_MDAV(k,records)
-    run_VMDAV(k,records)
-    run_KMean(k,records)
-    run_VKMean(k,records)
-    # run_GA(k,records)
+def run_algorithms(k, records):
+    # run_MDAV(k, records)
+    run_VMDAV(k, records)
+    run_KMean(k, records)
+    run_VKMean(k, records)
+    run_GA(k, records)
     # run_VGA(k,records)
-    # run_SA(k,records)
-    # run_VSA(k,records)
-    # run_PSO(k,records)
-    # run_VPSO(k,records)
-    run_GRAPH(k,records)
-    run_MDAV_GRAPH(k,records)
+    run_SA(k, records)
+    run_VSA(k, records)
+    run_PSO(k, records)
+    run_VPSO(k, records)
+    run_GRAPH(k, records)
+    run_MDAV_GRAPH(k, records)
     run_MDAV_GA(k, records)
+
+
+if __name__ == "__main__":
+    k = [3, 4, 5, 6]
+    dt_barcelona = '../Datasets/barcelona.csv'
+    dt_Census = '../Datasets/Census.csv'
+    dt_EIA = '../Datasets/EIA.csv'
+    dt_madrid = '../Datasets/madrid.csv'
+    dt_tarraco = '../Datasets/tarraco.csv'
+    dt_tarragona = '../Datasets/tarragona.csv'
+
+    datasets1 = [ dt_barcelona, dt_madrid, dt_tarraco]
+    datasets2 = [dt_EIA, dt_Census, dt_tarragona]
+    for dt in datasets1:
+        print("*** WORKING ON:", dt)
+        records = read_dataset_wo_header(dt)
+        # run_algorithms(k, records)
+        run_PSO(k, records)
+
+    for dt in datasets2:
+        print("*** WORKING ON:", dt)
+        records = read_dataset(dt)
+        # run_algorithms(k, records)
+        run_PSO(k, records)
+    # k = [4]
+    # records = read_dataset_wo_header(dt_barcelona)
+    # run_PSO(k, records)
+
+

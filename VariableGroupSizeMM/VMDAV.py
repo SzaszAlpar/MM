@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
+from FixedGroupSizeMM import calculate_inf_loss
 
 
 def read_data_normalized():
@@ -130,11 +131,13 @@ def V_MDAV(records, k):
         gr_extension = []
         gr_extension_indexes = []
         # while there are records that are closer to this group than to the unassigned records
-        while should_add_record(d_in, d_out):
+        while should_add_record(d_in, d_out) and len(gr_extension) < k - 1:
             gr_extension.append(e_in.copy())
             gr_extension_indexes.append(record_indices[e_in_index].copy())
             records = np.delete(records, e_in_index, 0)
             record_indices = np.delete(record_indices, e_in_index, 0)
+            if len(records) == 0:
+                break
 
             e_in, e_in_index, d_in = get_closest_from_group(gr, records)
             e_out, e_out_index, d_out = get_closest_from_vector(records, e_in)
