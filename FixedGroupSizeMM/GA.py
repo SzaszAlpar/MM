@@ -48,9 +48,9 @@ def initialize_population(size, chromosome_length, n_clusters, k, records):
 
 def initialize_population_and_adjust_with_SA(size, chromosome_length, n_clusters, k, records):
     pop = initialize_population(size, chromosome_length, n_clusters, k, records)
-    initial_temperature = 100
+    initial_temperature = 50
     cooling_rate = 0.85
-    max_iterations = 400
+    max_iterations = 100
     min_energy_threshold = 1e-5
     max_stagnation_iterations = 25
     new_pop = []
