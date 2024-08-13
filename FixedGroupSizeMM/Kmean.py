@@ -190,7 +190,7 @@ def kmeans_microaggregation(data, k):
 def main():
     pd.options.mode.chained_assignment = None  # default='warn'
     [records, sc, full_data] = read_data_normalized()
-    k = 100
+    k = 3
     n_clusters = len(records) // k
     print("Maximum number of clusters: ", n_clusters)
 
@@ -200,16 +200,16 @@ def main():
     for i, gr in enumerate(groups):
         print(i, ". group size: ", len(gr))
 
-    ResultInterpreter.plot_some_results(result_idx)
+    # ResultInterpreter.plot_some_results(result_idx)
 
     centroids = aggregate(groups)
     print("centroids:", centroids)
-    RI = ResultInterpreter.Interpreter(groups, centroids, sc)
-    RI.set_full_groups(full_data, result_idx)
-    RI.print_group_analysis([3, 8, 2])
-    RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
-    RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
-    RI.calculate_homogeneity()
+    # RI = ResultInterpreter.Interpreter(groups, centroids, sc)
+    # RI.set_full_groups(full_data, result_idx)
+    # RI.print_group_analysis([3, 8, 2])
+    # RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
+    # RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
+    # RI.calculate_homogeneity()
 
 
 if __name__ == "__main__":

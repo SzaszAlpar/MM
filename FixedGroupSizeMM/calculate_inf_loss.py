@@ -103,13 +103,13 @@ def run_VKMean(kx, records):
 
 def run_GA(kx, records):
     for k in kx:
-        suppress_output()
+        # suppress_output()
         population_zise = 10
-        generations = 100
+        generations = 10
         n_clusters = len(records) // k
 
         cluster_assignment, best_fitness = GA.genetic_algorithm(records, n_clusters, generations, k, population_zise)
-        restore_output()
+        # restore_output()
 
         print("GA, k=", k, ".\nReturned best fitness: ", best_fitness)
 
@@ -119,18 +119,15 @@ def run_GA(kx, records):
 # Ezt az algoritmust kell modositani, nem talal a visszateritatt fitness a kiszamolt SSE-vel (ugyanaz kellene legyen)
 def run_VGA(kx, records):
     for k in kx:
-        suppress_output()
-        population_zise = 50
-        generations = 3
-        max_clusters = len(records) // k
-        min_clusters = len(records) // (2 * k - 1)
+        # suppress_output()
+        population_zise = 10
+        generations = 15
 
-        best_solution, best_fitness = GA2.genetic_algorithm(records, min_clusters, max_clusters, generations, k,
-                                                            population_zise)
-        cluster_assignment, best_n_clusters = best_solution
-        restore_output()
+        cluster_assignment, best_fitness = GA2.genetic_algorithm(records, generations, k, population_zise)
 
-        print("VGA, k=", k, ".\nReturned best fitness: ", best_fitness, " , result has ", best_n_clusters, " clusters")
+        # restore_output()
+
+        print("VGA, k=", k, ".\nReturned best fitness: ", best_fitness)
 
         calculate_I_loss(records, cluster_assignment)
 
@@ -138,7 +135,7 @@ def run_VGA(kx, records):
 def run_SA(kx, records):
     initial_temperature = 1000
     cooling_rate = 0.99
-    max_iterations = 2000
+    max_iterations = 10000
     min_energy_threshold = 1e-5
     max_stagnation_iterations = 100
     for k in kx:
@@ -262,6 +259,7 @@ def calculate_I_loss(data, result):
     # SSE
     SSE = 0
     unique_groups = np.unique(result)
+    print("unique groups:", len(unique_groups))
     for group in unique_groups:
         group_indices = np.where(result == group)
         group_data = data[group_indices]
@@ -272,6 +270,15 @@ def calculate_I_loss(data, result):
     print("SSE:", SSE)
     print("I_loss:", (SSE / SST) * 100)
     print("\n")
+
+    cluster_counts = {}
+    for gene in result:
+        if gene in cluster_counts:
+            cluster_counts[gene] += 1
+        else:
+            cluster_counts[gene] = 1
+    print("cluster counts:", cluster_counts)
+    exit(0)
 
 
 def run_algorithms(k, records):
@@ -291,29 +298,28 @@ def run_algorithms(k, records):
 
 
 if __name__ == "__main__":
-    k = [3, 4, 5, 6]
-    dt_barcelona = '../Datasets/barcelona.csv'
-    dt_Census = '../Datasets/Census.csv'
-    dt_EIA = '../Datasets/EIA.csv'
-    dt_madrid = '../Datasets/madrid.csv'
-    dt_tarraco = '../Datasets/tarraco.csv'
+    # k = [3, 4, 5, 6]
+    # dt_barcelona = '../Datasets/barcelona.csv'
+    # dt_Census = '../Datasets/Census.csv'
+    # dt_EIA = '../Datasets/EIA.csv'
+    # dt_madrid = '../Datasets/madrid.csv'
+    # dt_tarraco = '../Datasets/tarraco.csv'
     dt_tarragona = '../Datasets/tarragona.csv'
+    #
+    # datasets1 = [ dt_barcelona, dt_madrid, dt_tarraco]
+    # datasets2 = [dt_EIA, dt_Census, dt_tarragona]
+    # for dt in datasets1:
+    #     print("*** WORKING ON:", dt)
+    #     records = read_dataset_wo_header(dt)
+    #     # run_algorithms(k, records)
+    #     run_PSO(k, records)
+    #
+    # for dt in datasets2:
+    #     print("*** WORKING ON:", dt)
+    #     records = read_dataset(dt)
+    #     # run_algorithms(k, records)
+    #     run_PSO(k, records)
 
-    datasets1 = [ dt_barcelona, dt_madrid, dt_tarraco]
-    datasets2 = [dt_EIA, dt_Census, dt_tarragona]
-    for dt in datasets1:
-        print("*** WORKING ON:", dt)
-        records = read_dataset_wo_header(dt)
-        # run_algorithms(k, records)
-        run_PSO(k, records)
-
-    for dt in datasets2:
-        print("*** WORKING ON:", dt)
-        records = read_dataset(dt)
-        # run_algorithms(k, records)
-        run_PSO(k, records)
-    # k = [4]
-    # records = read_dataset_wo_header(dt_barcelona)
-    # run_PSO(k, records)
-
-
+    k = [3]
+    records = read_dataset(dt_tarragona)
+    run_SA(k, records)
