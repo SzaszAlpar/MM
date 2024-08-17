@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from FixedGroupSizeMM import MDAV, Kmean, GA, SA, PSO, MDAV_GA
+from FixedGroupSizeMM import MDAV, Kmean, GA, SA, PSO, COMBINED
 from VariableGroupSizeMM import VMDAV, VKmean, GA2, SA2, PSO2, Graphh, MDAV_graph
 import sys
 import os
@@ -35,6 +35,7 @@ def read_dataset(path):
     df = pd.read_csv(path)
     columns = df.columns
     scalers = {}
+
     for column in columns:
         scaler = StandardScaler()
         df[column] = scaler.fit_transform(df[column].to_numpy().reshape(-1, 1))
@@ -278,7 +279,7 @@ def calculate_I_loss(data, result):
         else:
             cluster_counts[gene] = 1
     print("cluster counts:", cluster_counts)
-    exit(0)
+    # exit(0)
 
 
 def run_algorithms(k, records):
@@ -299,10 +300,10 @@ def run_algorithms(k, records):
 
 if __name__ == "__main__":
     # k = [3, 4, 5, 6]
-    # dt_barcelona = '../Datasets/barcelona.csv'
+    dt_barcelona = '../Datasets/barcelona.csv'
     # dt_Census = '../Datasets/Census.csv'
     # dt_EIA = '../Datasets/EIA.csv'
-    # dt_madrid = '../Datasets/madrid.csv'
+    dt_madrid = '../Datasets/madrid.csv'
     # dt_tarraco = '../Datasets/tarraco.csv'
     dt_tarragona = '../Datasets/tarragona.csv'
     #
@@ -321,5 +322,5 @@ if __name__ == "__main__":
     #     run_PSO(k, records)
 
     k = [3]
-    records = read_dataset(dt_tarragona)
-    run_SA(k, records)
+    records = read_dataset_wo_header(dt_madrid)
+    run_MDAV(k, records)

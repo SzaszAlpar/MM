@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import random
 import ResultInterpreter
+import calculate_inf_loss
 
 
 def read_data_normalized():
@@ -63,7 +64,7 @@ def calculate_energy(solution, data, num_clusters):
 def perturb_solution(solution):
     # Perturb the solution by reassigning some points randomly to different clusters
     perturbed_solution = solution.copy()
-    num_perturbations = len(solution) // 10  # Change 10% of the points
+    num_perturbations = len(solution) // 1  # Change 10% of the points
     indices_to_perturb = random.sample(range(len(solution)), num_perturbations)
     indices_to_swap_with = random.sample(range(len(solution)), num_perturbations)
     for count, idx in enumerate(indices_to_perturb):
@@ -91,7 +92,7 @@ def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterati
         if current_energy < min_energy_threshold:
             break
 
-        neighbor_solution = generate_neighbor2(current_solution)
+        neighbor_solution = generate_neighbor(current_solution)
         neighbor_energy = calculate_energy(neighbor_solution, data, num_clusters)
 
         if neighbor_energy < current_energy or random.random() < np.exp(
@@ -112,6 +113,10 @@ def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterati
             stagnation_counter = 0
 
         temperature *= cooling_rate
+        if iteration % 100 == 0:
+            print("iteration",iteration)
+            print("Current best energy:",best_energy)
+
 
     return best_solution, best_energy
 
@@ -159,11 +164,12 @@ def simulated_annealing22(data, k, initial_temperature, cooling_rate, max_iterat
 
 def main():
     pd.options.mode.chained_assignment = None  # default='warn'
-    [records, sc, full_data] = read_data_normalized()
+    dt_tarragona = '../Datasets/tarragona.csv'
+    records = calculate_inf_loss.read_dataset(dt_tarragona)
     k = 3
     initial_temperature = 1000
     cooling_rate = 0.99
-    max_iterations = 10000
+    max_iterations = 15000
     min_energy_threshold = 1e-5  # Minimum energy threshold to avoid getting stuck
     max_stagnation_iterations = 100  # Maximum iterations without significant improvement
 
@@ -173,6 +179,7 @@ def main():
     print("Best Solution:", best_solution)
     print("Best Energy:", best_energy)
     # interpret_result(best_solution, full_data, records, sc)
+    calculate_inf_loss.calculate_I_loss(records, best_solution)
 
 
 def interpret_result(best_solution, full_data, records, sc):

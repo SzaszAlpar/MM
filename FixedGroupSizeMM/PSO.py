@@ -1,11 +1,11 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-import ResultInterpreter
+import calculate_inf_loss
+from sklearn.cluster import KMeans
 
 
-def read_data_normalized():
+def read_testdata():
     df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
     df2 = df[
         ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
@@ -18,18 +18,24 @@ def read_data_normalized():
         scalers[column] = scaler
 
     df2 = df2.fillna(0).to_numpy()
-    return [df2, scalers, df.fillna(0).to_numpy()]
+    return df2
+
+
+def normalize_data(data, overall_min, overall_max):
+    return 2 * (data - overall_min) / (overall_max - overall_min) - 1
 
 
 def fitness_function(centroids, data, k):
     assignments = assign_data_to_clusters(data, centroids, k)
 
-    quantization_error = 0
-    for j in range(len(centroids)):
-        assigned_points = data[assignments == j]
-        squared_distances = np.linalg.norm(assigned_points - centroids[j], axis=1) ** 2
-        quantization_error += np.sum(squared_distances)
-    return quantization_error
+    SSE = 0
+    unique_groups = np.unique(assignments)
+    for group in unique_groups:
+        group_indices = np.where(assignments == group)
+        group_data = data[group_indices]
+        group_mean = np.mean(group_data, axis=0)
+        SSE += np.sum((group_data - group_mean) ** 2)
+    return SSE
 
 
 def assign_data_to_clusters(data, centroids, k):
@@ -51,71 +57,56 @@ def assign_data_to_clusters(data, centroids, k):
 
     remaining_indices = np.where(assignments == -1)[0]
     assignments[remaining_indices] = len(centroids) - 1
-
     return assignments
 
 
-def reassign_points(assignments, centroids, k):
-    while True:
-        # if any cluster is smaller than k, we reassign the clusters
-        cluster_sizes = np.bincount(assignments, minlength=len(centroids))
-        if np.all(cluster_sizes >= k):
-            break
+def initialize_particles(data, num_particles, num_clusters, num_dimensions):
+    num_kmeans_particles = num_particles // 2
 
-        small_clusters = np.where(cluster_sizes < k)[0]
-        for cluster in small_clusters:
-            largest_cluster = np.argmax(cluster_sizes)
-            points_in_largest_cluster = np.where(assignments == largest_cluster)[0]
-            points_to_reassign = points_in_largest_cluster[:k - cluster_sizes[cluster]]
-            assignments[points_to_reassign] = cluster
-            cluster_sizes = np.bincount(assignments, minlength=len(centroids))
-    return assignments
+    kmeans = KMeans(n_clusters=num_clusters).fit(data)
+    centroids = kmeans.cluster_centers_
+    particles = np.zeros((num_particles, num_clusters, num_dimensions))
+    for i in range(num_kmeans_particles):
+        jitter = np.random.normal(0, 0.1, centroids.shape)
+        particles[i] = np.clip(centroids + jitter, 0, 1)
 
+    for i in range(num_kmeans_particles, num_particles):
+        particles[i] = np.random.rand(num_clusters, num_dimensions)
 
-def get_centroid(records, nn):
-    record_number = len(records)
-    centroid = np.zeros(nn)
-    if record_number == 0:
-        return centroid
-    else:
-        return np.average(records, axis=0)
+    return particles
 
 
-def aggregate(data, best_solution):
-    result = []
-    nn = data.shape[1]
-    groups_numbers = np.unique(best_solution)
-    for i in groups_numbers:
-        group = data[best_solution == i]
-        result.append(get_centroid(group, nn))
-    return result
-
-
-def PSO(data, k, num_particles, max_iterations, w, c1, c2):
-    num_dimensions = data.shape[1]
-    num_clusters = len(data) // k
+def PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions, num_clusters, particles):
     w_max = 0.9
     w_min = 0.4
-    particles = np.random.rand(num_particles, num_clusters, num_dimensions)
-    velocities = np.random.rand(num_particles, num_clusters, num_dimensions) * 0.1
+    velocities = np.random.uniform(-0.1, 0.1, size=(num_particles, num_clusters, num_dimensions))
 
     pBests = particles.copy()
     pBest_values = np.array([fitness_function(p, data, k) for p in pBests])
     gBest = pBests[np.argmin(pBest_values)]
     gBest_value = np.min(pBest_values)
+    stagnation_threshold = 0.01
+    improvement_threshold = 0.001
 
     for iteration in range(max_iterations):
-        print("iteration ", iteration)
         w = w_max - ((w_max - w_min) * iteration / max_iterations)
+        c1_dynamic = c1 + iteration / max_iterations * 0.5  # Increase c1 slightly over time
+        c2_dynamic = c2 - iteration / max_iterations * 0.5  # Decrease c2 slightly over time
+        improvement = np.abs(gBest_value - np.min(pBest_values))
+
+        # Check for stagnation and adjust velocities
+        if improvement < improvement_threshold:
+            velocities += np.random.rand(num_particles, num_clusters, num_dimensions) * stagnation_threshold
+
         for i in range(num_particles):
             r1, r2 = np.random.rand(2)
             velocities[i] = (w * velocities[i] +
-                             c1 * r1 * (pBests[i] - particles[i]) +
-                             c2 * r2 * (gBest - particles[i]))
+                             c1_dynamic * r1 * (pBests[i] - particles[i]) +
+                             c2_dynamic * r2 * (gBest - particles[i]))
             particles[i] += velocities[i]
 
             # Ensure particles stay within bounds
-            particles[i] = np.clip(particles[i], 0, 1)
+            particles[i] = np.clip(particles[i], -1, 1)
 
             current_fitness = fitness_function(particles[i], data, k)
             if current_fitness < pBest_values[i]:
@@ -124,67 +115,49 @@ def PSO(data, k, num_particles, max_iterations, w, c1, c2):
                 if current_fitness < gBest_value:
                     gBest = particles[i]
                     gBest_value = current_fitness
+        if iteration % 10 == 0:
+            print("iteration ", iteration)
+            print("current best", gBest_value)
     return [gBest, gBest_value]
+
+
+def PSO(data, k, num_particles, max_iterations, c1, c2):
+    overall_min = np.min(data)
+    overall_max = np.max(data)
+    data = normalize_data(data, overall_min, overall_max)
+    num_dimensions = data.shape[1]
+    num_clusters = len(data) // k
+    particles = np.random.uniform(-1, 1, size=(num_particles, num_clusters, num_dimensions))
+    return PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions, num_clusters, particles)
+
+
+def PSO_initalized_with_kmean(data, k, num_particles, max_iterations, c1, c2):
+    overall_min = np.min(data)
+    overall_max = np.max(data)
+    data = normalize_data(data, overall_min, overall_max)
+    num_dimensions = data.shape[1]
+    num_clusters = len(data) // k
+    particles = initialize_particles(data, num_particles, num_clusters, num_dimensions)
+    return PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions, num_clusters, particles)
 
 
 def main():
     pd.options.mode.chained_assignment = None  # default='warn'
-    data = np.random.rand(10, 2)
-    print("data", data)
-    num_particles = 200
-    k = 5
-    max_iterations = 10
-    w = 0.5  # Inertia weight
+
+    dataset_Census = '../Datasets/Census.csv'
+    dt_tarragona = '../Datasets/tarragona.csv'
+    records = calculate_inf_loss.read_dataset(dt_tarragona)
+
+    k = 3
+    num_particles = 40
+    max_iterations = 4
     c1 = 1.5  # Cognitive constant
-    c2 = 1.5  # Social constant
-    [gBest, gBest_value] = PSO(data, k, num_particles, max_iterations, w, c1, c2)
+    c2 = 2.0  # Social constant
+    [gBest, gBest_value] = PSO(records, k, num_particles, max_iterations, c1, c2)
 
     print("gbest value:", gBest_value)
-    print("gbest :", gBest)
-
-    group_assignments = assign_data_to_clusters(data, gBest, k)
-    print("group_assignments:", group_assignments)
-
-    colors = group_assignments
-    plt.scatter(data[:, 0], data[:, 1], c=colors, cmap='viridis')
-    plt.scatter(gBest[:, 0], gBest[:, 1], c='red', marker='x', label='Centroids')
-    plt.title('Data Points Grouped by PSO-based k-means Clustering')
-    plt.xlabel('Feature 1')
-    plt.ylabel('Feature 2')
-    plt.legend()
-    plt.show()
-
-
-def main2():
-    pd.options.mode.chained_assignment = None  # default='warn'
-    [records, sc, full_data] = read_data_normalized()
-    num_particles = 200
-    k = 40
-    max_iterations = 10
-    w = 0.5  # Inertia weight
-    c1 = 1.5  # Cognitive constant
-    c2 = 1.5  # Social constant
-    [gBest, gBest_value] = PSO(records, k, num_particles, max_iterations, w, c1, c2)
-
-    print("gbest value:", gBest_value)
-
     group_assignments = assign_data_to_clusters(records, gBest, k)
-    print("group_assignments:", group_assignments)
-
-    interpret_result(group_assignments, full_data, records, sc)
-
-
-def interpret_result(best_solution, full_data, records, sc):
-    centroids = ResultInterpreter.aggregate(records, best_solution)
-    groups = ResultInterpreter.get_groups(records, best_solution)
-    for i, gr in enumerate(groups):
-        print(i, ". group size: ", len(gr))
-    RI = ResultInterpreter.Interpreter(groups, centroids, sc)
-    RI.set_full_groups(full_data, best_solution)
-    RI.print_group_analysis([3, 8, 2])
-    RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
-    RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
-    RI.calculate_homogeneity()
+    calculate_inf_loss.calculate_I_loss(records, group_assignments)
 
 
 if __name__ == "__main__":
