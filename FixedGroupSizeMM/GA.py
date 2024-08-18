@@ -469,7 +469,6 @@ def boosted_genetic_algorithm(records, n_clusters, generations, k, population_si
     stagnation_count = 0
 
     for generation in range(generations):
-        print(generation, ". generation:")
         fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
 
         if min(fitnesses) < best_fitness:
@@ -497,10 +496,14 @@ def boosted_genetic_algorithm(records, n_clusters, generations, k, population_si
 
         population.extend(offspring)
         new_fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
-        print("Generations fitnesses:", fitnesses)
         population = elitism_selection(population, new_fitnesses, population_size)
 
-        print("Current best fitness:", best_fitness)
+        if generation % 100 == 0:
+            print(generation, ". generation:")
+            print("Generations fitnesses:", fitnesses)
+            print("Current best fitness:", best_fitness)
+
+    calculate_inf_loss.calculate_I_loss(records,best_solution)
 
     return best_solution, best_fitness
 

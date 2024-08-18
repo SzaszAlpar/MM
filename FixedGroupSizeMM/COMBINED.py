@@ -108,22 +108,29 @@ def first_SA_then_GA(records, k, population_size, generations):
     return best_solution
 
 
-def first_PSO_then_GA(records, k, population_size, generations):
-    num_particles = 30
-    max_iterations = 200
+def first_PSO_then_GA(dt_tuple, k, population_size, generations):
+    name, category = dt_tuple
+    if category:
+        records = calculate_inf_loss.read_dataset(name)
+    else:
+        records = calculate_inf_loss.read_dataset_wo_header(name)
+
+    num_particles = 50
+    max_iterations = 400
     c1 = 1.5  # Cognitive constant
-    c2 = 2.0  # Social constant
-    [gBest, gBest_value] = PSO.PSO(records, k, num_particles, max_iterations, c1, c2)
+    c2 = 2.5  # Social constant
+    [gBest, gBest_value] = PSO.PSO(dt_tuple, k, num_particles, max_iterations, c1, c2)
     group_assignments = PSO.assign_data_to_clusters(records, gBest, k)
 
-    print("PSA is done, SSE value:", get_SSE(group_assignments, records))
+    print("PSA is done. Current results:")
+    calculate_inf_loss.calculate_I_loss(records, group_assignments)
 
     n_clusters = len(records) // k
     population = GA.initialize_population_with_given_value(population_size, len(records), n_clusters, k,
                                                            group_assignments)
-    best_solution, best_fitness = GA.genetic_algorithm(records, n_clusters, generations, k, population_size, population)
+    best_solution, best_fitness = GA.boosted_genetic_algorithm(records, n_clusters, generations, k, population_size,population)
 
-    print("GA is done, SSE value:", get_SSE(best_solution, records))
+    # print("GA is done, SSE value:", get_SSE(best_solution, records))
 
     return best_solution
 
@@ -135,21 +142,33 @@ if __name__ == "__main__":
     dt_madrid = '../Datasets/madrid.csv'
     dt_barcelona = '../Datasets/barcelona.csv'
     dt_tarraco = '../Datasets/tarraco.csv'
-    # records = calculate_inf_loss.read_dataset(dt_EIA)
-    # records = calculate_inf_loss.read_dataset_wo_header(dt_tarraco)
+
     generations = 500
     population_size = 50
 
-    datasets1 = [dt_madrid, dt_tarraco]
-    datasets2 = [dt_Census, dt_tarragona]
+    # datasets1 = [dt_madrid, dt_tarraco,dt_barcelona]
+    # datasets2 = [dt_tarragona,dt_Census,dt_EIA]
+
+
+
+    datasets1 = [dt_tarragona]
     for dt in datasets1:
         print("*** WORKING ON:", dt)
-        records = calculate_inf_loss.read_dataset_wo_header(dt)
-        fa = first_PSO_then_GA(records, 4, population_size, generations)
-        calculate_inf_loss.calculate_I_loss(records, fa)
+        name_tuple = [dt, 1]
+        fa = first_PSO_then_GA(name_tuple, 5, population_size, generations)
+        # calculate_inf_loss.calculate_I_loss(records, fa)
 
-    for dt in datasets2:
-        print("*** WORKING ON:", dt)
-        records = calculate_inf_loss.read_dataset(dt)
-        fa = first_PSO_then_GA(records, 4, population_size, generations)
-        calculate_inf_loss.calculate_I_loss(records, fa)
+    # for dt in datasets2:
+    #     print("*** WORKING ON:", dt)
+    #     # records = calculate_inf_loss.read_dataset(dt)
+    #     name_tuple = [dt, 0]
+    #     fa = first_PSO_then_GA(name_tuple, 3, population_size, generations)
+    #     # calculate_inf_loss.calculate_I_loss(records, fa)
+
+    # for dt in datasets2:
+    #     print("*** WORKING ON:", dt)
+    #     records = calculate_inf_loss.read_dataset(dt)
+    #     fa = first_SA_then_GA(records, 3, population_size, generations)
+    #     calculate_inf_loss.calculate_I_loss(records, fa)
+
+

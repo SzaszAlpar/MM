@@ -1,6 +1,8 @@
+import random
+
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import calculate_inf_loss
 from sklearn.cluster import KMeans
 
@@ -13,12 +15,37 @@ def read_testdata():
                     'Daily Steps']
     scalers = {}
     for column in column_names:
-        scaler = StandardScaler()
+        scaler = MinMaxScaler()
         df2[column] = scaler.fit_transform(df2[column].to_numpy().reshape(-1, 1))
         scalers[column] = scaler
 
     df2 = df2.fillna(0).to_numpy()
     return df2
+
+
+def read_dataset_wo_header(path):
+    df = pd.read_csv(path, sep=';', header=None)
+
+    scalers = {}
+    for column in range(len(df.columns)):
+        scaler = MinMaxScaler()
+        df[column] = scaler.fit_transform(df[column].to_numpy().reshape(-1, 1))
+        scalers[column] = scaler
+    df = df.fillna(0).to_numpy()
+    return df
+
+
+def read_dataset(path):
+    df = pd.read_csv(path)
+    columns = df.columns
+    scalers = {}
+
+    for column in columns:
+        scaler = MinMaxScaler()
+        df[column] = scaler.fit_transform(df[column].to_numpy().reshape(-1, 1))
+        scalers[column] = scaler
+    df = df.fillna(0).to_numpy()
+    return df
 
 
 def normalize_data(data, overall_min, overall_max):
@@ -79,7 +106,7 @@ def initialize_particles(data, num_particles, num_clusters, num_dimensions):
 def PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions, num_clusters, particles):
     w_max = 0.9
     w_min = 0.4
-    velocities = np.random.uniform(-0.1, 0.1, size=(num_particles, num_clusters, num_dimensions))
+    velocities = np.random.rand(num_particles, num_clusters, num_dimensions) * 0.1
 
     pBests = particles.copy()
     pBest_values = np.array([fitness_function(p, data, k) for p in pBests])
@@ -92,6 +119,8 @@ def PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions,
         w = w_max - ((w_max - w_min) * iteration / max_iterations)
         c1_dynamic = c1 + iteration / max_iterations * 0.5  # Increase c1 slightly over time
         c2_dynamic = c2 - iteration / max_iterations * 0.5  # Decrease c2 slightly over time
+        # c1_dynamic = c1 - (iteration / max_iterations) * (c1 - 1.0)
+        # c2_dynamic = c2 + (iteration / max_iterations) * (2.0 - c2)
         improvement = np.abs(gBest_value - np.min(pBest_values))
 
         # Check for stagnation and adjust velocities
@@ -106,7 +135,7 @@ def PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions,
             particles[i] += velocities[i]
 
             # Ensure particles stay within bounds
-            particles[i] = np.clip(particles[i], -1, 1)
+            particles[i] = np.clip(particles[i], 0, 1)
 
             current_fitness = fitness_function(particles[i], data, k)
             if current_fitness < pBest_values[i]:
@@ -117,17 +146,19 @@ def PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions,
                     gBest_value = current_fitness
         if iteration % 10 == 0:
             print("iteration ", iteration)
-            print("current best", gBest_value)
+            # print("current best", gBest_value)
     return [gBest, gBest_value]
 
 
-def PSO(data, k, num_particles, max_iterations, c1, c2):
-    overall_min = np.min(data)
-    overall_max = np.max(data)
-    data = normalize_data(data, overall_min, overall_max)
+def PSO(dt_tuple, k, num_particles, max_iterations, c1, c2):
+    name, category = dt_tuple
+    if category:
+        data = read_dataset(name)
+    else:
+        data = read_dataset_wo_header(name)
     num_dimensions = data.shape[1]
     num_clusters = len(data) // k
-    particles = np.random.uniform(-1, 1, size=(num_particles, num_clusters, num_dimensions))
+    particles = np.random.rand(num_particles, num_clusters, num_dimensions)
     return PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions, num_clusters, particles)
 
 
@@ -146,18 +177,33 @@ def main():
 
     dataset_Census = '../Datasets/Census.csv'
     dt_tarragona = '../Datasets/tarragona.csv'
-    records = calculate_inf_loss.read_dataset(dt_tarragona)
 
     k = 3
-    num_particles = 40
-    max_iterations = 4
+    num_particles = 60
+    max_iterations = 400
     c1 = 1.5  # Cognitive constant
     c2 = 2.0  # Social constant
-    [gBest, gBest_value] = PSO(records, k, num_particles, max_iterations, c1, c2)
+    [gBest, gBest_value] = PSO([dt_tarragona, 1], k, num_particles, max_iterations, c1, c2)
 
     print("gbest value:", gBest_value)
+
+    records = calculate_inf_loss.read_dataset(dt_tarragona)
     group_assignments = assign_data_to_clusters(records, gBest, k)
     calculate_inf_loss.calculate_I_loss(records, group_assignments)
+
+
+def main2():
+    max_iterations = 100
+    c1 = 1.5  # Cognitive constant
+    c2 = 2.5  # Social constant
+
+    for iteration in range(max_iterations):
+        # c1_dynamic = c1 - (iteration / max_iterations) * (c1 - 1.0)
+        # c2_dynamic = c2 + (iteration / max_iterations) * (2.0 - c2)
+        c1_dynamic = c1 + iteration / max_iterations * 0.5  # Increase c1 slightly over time
+        c2_dynamic = c2 - iteration / max_iterations * 0.5  # Decrease c2 slightly over tim
+        print("c1:,", c1_dynamic)
+        print("c2:,", c2_dynamic)
 
 
 if __name__ == "__main__":
