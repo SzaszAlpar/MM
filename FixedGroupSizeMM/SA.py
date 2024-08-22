@@ -46,19 +46,40 @@ def generate_neighbor(solution):
     neighbor[i], neighbor[j] = neighbor[j], neighbor[i]
     return neighbor
 
+
 def generate_neighbor2(solution):
     return perturb_solution(solution)
 
 
+def generate_neighbor3(solution, probability_threshold=0.99):
+    n = len(solution)
+    flag = False
+    i = 0
+
+    while i < n or not flag:
+        u = random.uniform(0, 1)
+
+        if u > probability_threshold:
+            flag = True
+            i, j = random.sample(range(n), 2)
+            solution[i], solution[j] = solution[j], solution[i]
+        i += 1
+        if i == n and flag:
+            break
+        if i == n:
+            i = 0
+    return solution
+
+
 def calculate_energy(solution, data, num_clusters):
-    sse = 0
-    for i in range(num_clusters):
-        # we want to get all data points assigned to cluster i
-        cluster = data[solution == i]
-        if len(cluster) > 0:
-            centroid = cluster.mean(axis=0)
-            sse += np.sum((cluster - centroid) ** 2)
-    return sse
+    SSE = 0
+    unique_groups = np.unique(solution)
+    for group in unique_groups:
+        group_indices = np.where(solution == group)
+        group_data = data[group_indices]
+        group_mean = np.mean(group_data, axis=0)
+        SSE += np.sum((group_data - group_mean) ** 2)
+    return SSE
 
 
 def perturb_solution(solution):
@@ -114,9 +135,8 @@ def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterati
 
         temperature *= cooling_rate
         if iteration % 100 == 0:
-            print("iteration",iteration)
-            print("Current best energy:",best_energy)
-
+            print("iteration", iteration)
+            print("Current best energy:", best_energy)
 
     return best_solution, best_energy
 
@@ -167,11 +187,11 @@ def main():
     dt_tarragona = '../Datasets/tarragona.csv'
     records = calculate_inf_loss.read_dataset(dt_tarragona)
     k = 3
-    initial_temperature = 1000
-    cooling_rate = 0.99
-    max_iterations = 15000
+    initial_temperature = 45
+    cooling_rate = 0.90
+    max_iterations = 30000
     min_energy_threshold = 1e-5  # Minimum energy threshold to avoid getting stuck
-    max_stagnation_iterations = 100  # Maximum iterations without significant improvement
+    max_stagnation_iterations = 400  # Maximum iterations without significant improvement
 
     best_solution, best_energy = simulated_annealing2(records, k, initial_temperature, cooling_rate,
                                                       max_iterations, min_energy_threshold, max_stagnation_iterations)
