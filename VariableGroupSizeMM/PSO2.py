@@ -1,24 +1,38 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from FixedGroupSizeMM import ResultInterpreter
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import MinMaxScaler
+
+from FixedGroupSizeMM import calculate_inf_loss
 
 
-def read_data_normalized():
-    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
-    df2 = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
+def read_dataset_wo_header(path):
+    df = pd.read_csv(path, sep=';', header=None)
+
     scalers = {}
-    for column in column_names:
-        scaler = StandardScaler()
-        df2[column] = scaler.fit_transform(df2[column].to_numpy().reshape(-1, 1))
+    for column in range(len(df.columns)):
+        scaler = MinMaxScaler()
+        df[column] = scaler.fit_transform(df[column].to_numpy().reshape(-1, 1))
         scalers[column] = scaler
+    df = df.fillna(0).to_numpy()
+    return df
 
-    df2 = df2.fillna(0).to_numpy()
-    return [df2, scalers, df.fillna(0).to_numpy()]
+
+def read_dataset(path):
+    df = pd.read_csv(path)
+    columns = df.columns
+    scalers = {}
+
+    for column in columns:
+        scaler = MinMaxScaler()
+        df[column] = scaler.fit_transform(df[column].to_numpy().reshape(-1, 1))
+        scalers[column] = scaler
+    df = df.fillna(0).to_numpy()
+    return df
+
+
+def normalize_data(data, overall_min, overall_max):
+    return 2 * (data - overall_min) / (overall_max - overall_min) - 1
 
 
 def fitness_function(centroids, data, k):
@@ -80,46 +94,53 @@ def assign_data_to_clusters(data, centroids, k):
                         break
     return assignments
 
-def get_centroid(records, nn):
-    record_number = len(records)
-    centroid = np.zeros(nn)
-    if record_number == 0:
-        return centroid
-    else:
-        return np.average(records, axis=0)
+
+def initialize_particles(data, num_particles, num_clusters, num_dimensions):
+    num_kmeans_particles = num_particles // 2
+
+    kmeans = KMeans(n_clusters=num_clusters).fit(data)
+    centroids = kmeans.cluster_centers_
+    particles = np.zeros((num_particles, num_clusters, num_dimensions))
+    for i in range(num_kmeans_particles):
+        jitter = np.random.normal(0, 0.1, centroids.shape)
+        particles[i] = np.clip(centroids + jitter, 0, 1)
+
+    for i in range(num_kmeans_particles, num_particles):
+        particles[i] = np.random.rand(num_clusters, num_dimensions)
+
+    return particles
 
 
-def aggregate(data, best_solution):
-    result = []
-    nn = data.shape[1]
-    groups_numbers = np.unique(best_solution)
-    for i in groups_numbers:
-        group = data[best_solution == i]
-        result.append(get_centroid(group, nn))
-    return result
-
-
-def PSO(data, k, num_particles, max_iterations, w, c1, c2):
-    num_dimensions = data.shape[1]
-    num_clusters = len(data) // k
+def PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions, num_clusters, particles):
     w_max = 0.9
     w_min = 0.4
-    particles = np.random.rand(num_particles, num_clusters, num_dimensions)
     velocities = np.random.rand(num_particles, num_clusters, num_dimensions) * 0.1
 
     pBests = particles.copy()
     pBest_values = np.array([fitness_function(p, data, k) for p in pBests])
     gBest = pBests[np.argmin(pBest_values)]
     gBest_value = np.min(pBest_values)
+    stagnation_threshold = 0.01
+    improvement_threshold = 0.001
+    w = 0.72
 
     for iteration in range(max_iterations):
-        print("iteration ", iteration)
-        w = w_max - ((w_max - w_min) * iteration / max_iterations)
+        # w = w_max - ((w_max - w_min) * iteration / max_iterations)
+        c1_dynamic = c1 + iteration / max_iterations * 0.5  # Increase c1 slightly over time
+        c2_dynamic = c2 - iteration / max_iterations * 0.5  # Decrease c2 slightly over time
+        # c1_dynamic = c1 - (iteration / max_iterations) * (c1 - 1.0)
+        # c2_dynamic = c2 + (iteration / max_iterations) * (2.0 - c2)
+        improvement = np.abs(gBest_value - np.min(pBest_values))
+
+        # Check for stagnation and adjust velocities
+        if improvement < improvement_threshold:
+            velocities += np.random.rand(num_particles, num_clusters, num_dimensions) * stagnation_threshold
+
         for i in range(num_particles):
             r1, r2 = np.random.rand(2)
             velocities[i] = (w * velocities[i] +
-                             c1 * r1 * (pBests[i] - particles[i]) +
-                             c2 * r2 * (gBest - particles[i]))
+                             c1_dynamic * r1 * (pBests[i] - particles[i]) +
+                             c2_dynamic * r2 * (gBest - particles[i]))
             particles[i] += velocities[i]
 
             # Ensure particles stay within bounds
@@ -132,67 +153,78 @@ def PSO(data, k, num_particles, max_iterations, w, c1, c2):
                 if current_fitness < gBest_value:
                     gBest = particles[i]
                     gBest_value = current_fitness
+        if iteration % 10 == 0:
+            print("iteration ", iteration)
+            # print("current best", gBest_value)
     return [gBest, gBest_value]
 
 
-def main():
-    pd.options.mode.chained_assignment = None  # default='warn'
-    data = np.random.rand(10, 2)
-    print("data", data)
-    num_particles = 200
-    k = 5
-    max_iterations = 10
-    w = 0.5  # Inertia weight
-    c1 = 1.5  # Cognitive constant
-    c2 = 1.5  # Social constant
-    [gBest, gBest_value] = PSO(data, k, num_particles, max_iterations, w, c1, c2)
+def PSO(dt_tuple, k, num_particles, max_iterations, c1, c2):
+    name, category = dt_tuple
+    if category:
+        data = read_dataset(name)
+    else:
+        data = read_dataset_wo_header(name)
+    num_dimensions = data.shape[1]
+    num_clusters = len(data) // k
+    particles = np.random.rand(num_particles, num_clusters, num_dimensions)
+    return PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions, num_clusters, particles)
 
-    print("gbest value:", gBest_value)
-    print("gbest :", gBest)
-    group_assignments = assign_data_to_clusters(data, gBest, k)
-    print("group_assignments:", group_assignments)
-    print("group_assignments:", group_assignments)
 
-    colors = group_assignments
-    plt.scatter(data[:, 0], data[:, 1], c=colors, cmap='viridis')
-    plt.scatter(gBest[:, 0], gBest[:, 1], c='red', marker='x', label='Centroids')
-    plt.title('Data Points Grouped by PSO-based k-means Clustering')
-    plt.xlabel('Feature 1')
-    plt.ylabel('Feature 2')
-    plt.legend()
-    plt.show()
+def PSO_initalized_with_kmean(data, k, num_particles, max_iterations, c1, c2):
+    overall_min = np.min(data)
+    overall_max = np.max(data)
+    data = normalize_data(data, overall_min, overall_max)
+    num_dimensions = data.shape[1]
+    num_clusters = len(data) // k
+    particles = initialize_particles(data, num_particles, num_clusters, num_dimensions)
+    return PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions, num_clusters, particles)
 
 
 def main2():
     pd.options.mode.chained_assignment = None  # default='warn'
-    [records, sc, full_data] = read_data_normalized()
-    num_particles = 200
-    k = 25
-    max_iterations = 152
-    w = 0.5  # Inertia weight
-    c1 = 1.5  # Cognitive constant
-    c2 = 1.5  # Social constant
-    [gBest, gBest_value] = PSO(records, k, num_particles, max_iterations, w, c1, c2)
+    dt_barcelona = '../Datasets/barcelona.csv'
+    dt_Census = '../Datasets/Census.csv'
+    dt_EIA = '../Datasets/EIA.csv'
+    dt_madrid = '../Datasets/madrid.csv'
+    dt_tarraco = '../Datasets/tarraco.csv'
+    dt_tarragona = '../Datasets/tarragona.csv'
 
-    print("gbest value:", gBest_value)
+    datasets1 = [dt_barcelona, dt_madrid, dt_tarraco]
+    datasets2 = [dt_tarragona, dt_Census, dt_EIA]
+    kx = [3, 4, 5]
 
-    group_assignments = assign_data_to_clusters(records, gBest, k)
-    print("group_assignments:", group_assignments)
+    for df in datasets1:
+        for k in kx:
+            # k = 5
+            print("working on" + df + " with k=", k)
+            num_particles = 50
+            max_iterations = 500
+            c1 = 1.49  # Cognitive constant
+            c2 = 1.49  # Social constant
+            [gBest, gBest_value] = PSO([df, 0], k, num_particles, max_iterations, c1, c2)
 
-    interpret_result(group_assignments, full_data, records, sc)
+            print("gbest value:", gBest_value)
 
+            records = calculate_inf_loss.read_dataset_wo_header(df)
+            group_assignments = assign_data_to_clusters(records, gBest, k)
+            calculate_inf_loss.calculate_I_loss(records, group_assignments)
 
-def interpret_result(best_solution, full_data, records, sc):
-    centroids = ResultInterpreter.aggregate(records, best_solution)
-    groups = ResultInterpreter.get_groups(records, best_solution)
-    for i, gr in enumerate(groups):
-        print(i, ". group size: ", len(gr))
-    RI = ResultInterpreter.Interpreter(groups, centroids, sc)
-    RI.set_full_groups(full_data, best_solution)
-    RI.print_group_analysis([3, 8, 2])
-    RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
-    RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
-    RI.calculate_homogeneity()
+    for df in datasets2:
+        for k in kx:
+            # k = 5
+            print("working on" + df + " with k=", k)
+            num_particles = 10
+            max_iterations = 400
+            c1 = 1.49  # Cognitive constant
+            c2 = 1.49  # Social constant
+            [gBest, gBest_value] = PSO([df, 1], k, num_particles, max_iterations, c1, c2)
+
+            print("gbest value:", gBest_value)
+
+            records = calculate_inf_loss.read_dataset(df)
+            group_assignments = assign_data_to_clusters(records, gBest, k)
+            calculate_inf_loss.calculate_I_loss(records, group_assignments)
 
 
 if __name__ == "__main__":

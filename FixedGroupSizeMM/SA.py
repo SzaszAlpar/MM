@@ -1,25 +1,9 @@
+import random
+
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-import random
-import ResultInterpreter
-import calculate_inf_loss
 
-
-def read_data_normalized():
-    df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
-    df2 = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
-    scalers = {}
-    for column in column_names:
-        scaler = StandardScaler()
-        df2[column] = scaler.fit_transform(df2[column].to_numpy().reshape(-1, 1))
-        scalers[column] = scaler
-
-    df2 = df2.fillna(0).to_numpy()
-    return [df2, scalers, df.fillna(0).to_numpy()]
+from FixedGroupSizeMM import calculate_inf_loss
 
 
 def initialize_solution(n, k):
@@ -185,34 +169,29 @@ def simulated_annealing22(data, k, initial_temperature, cooling_rate, max_iterat
 def main():
     pd.options.mode.chained_assignment = None  # default='warn'
     dt_tarragona = '../Datasets/tarragona.csv'
-    records = calculate_inf_loss.read_dataset(dt_tarragona)
-    k = 3
-    initial_temperature = 45
-    cooling_rate = 0.90
-    max_iterations = 30000
-    min_energy_threshold = 1e-5  # Minimum energy threshold to avoid getting stuck
-    max_stagnation_iterations = 400  # Maximum iterations without significant improvement
+    dt_EIA = '../Datasets/EIA.csv'
+    dt_Census = '../Datasets/Census.csv'
+    dt_madrid = '../Datasets/madrid.csv'
+    dt_barcelona = '../Datasets/barcelona.csv'
+    dt_tarraco = '../Datasets/tarraco.csv'
+    print("Working on dataset" + dt_EIA)
+    ks = [3, 4, 5]
+    for k in ks:
+        for i in range(1):
+            print("****************************")
+            print(i, ". iteration!")
+            records = calculate_inf_loss.read_dataset(dt_EIA)
+            initial_temperature = 45
+            cooling_rate = 0.90
+            max_iterations = 20000
+            min_energy_threshold = 1e-5  # Minimum energy threshold to avoid getting stuck
+            max_stagnation_iterations = 400  # Maximum iterations without significant improvement
 
-    best_solution, best_energy = simulated_annealing2(records, k, initial_temperature, cooling_rate,
-                                                      max_iterations, min_energy_threshold, max_stagnation_iterations)
+            best_solution, best_energy = simulated_annealing2(records, k, initial_temperature, cooling_rate,
+                                                              max_iterations, min_energy_threshold,
+                                                              max_stagnation_iterations)
 
-    print("Best Solution:", best_solution)
-    print("Best Energy:", best_energy)
-    # interpret_result(best_solution, full_data, records, sc)
-    calculate_inf_loss.calculate_I_loss(records, best_solution)
-
-
-def interpret_result(best_solution, full_data, records, sc):
-    centroids = ResultInterpreter.aggregate(records, best_solution)
-    groups = ResultInterpreter.get_groups(records, best_solution)
-    for i, gr in enumerate(groups):
-        print(i, ". group size: ", len(gr))
-    RI = ResultInterpreter.Interpreter(groups, centroids, sc)
-    RI.set_full_groups(full_data, best_solution)
-    RI.print_group_analysis([3, 8, 2])
-    RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
-    RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
-    RI.calculate_homogeneity()
+            calculate_inf_loss.calculate_I_loss(records, best_solution)
 
 
 if __name__ == "__main__":

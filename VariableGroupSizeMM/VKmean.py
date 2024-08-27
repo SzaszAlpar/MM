@@ -1,28 +1,7 @@
 import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from FixedGroupSizeMM import ResultInterpreter
 
 
-def read_data_normalized():
-    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
-    df2 = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
-
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
-    scalers = {}
-    for column in column_names:
-        scaler = StandardScaler()
-        df2[column] = scaler.fit_transform(df2[column].to_numpy().reshape(-1, 1))
-        scalers[column] = scaler
-
-    df2 = df2.fillna(0).to_numpy()
-    return [df2, scalers, df.fillna(0).to_numpy()]
-
-
-# we try to minimalize the inf loss
 def information_loss(clusters):
     loss = 0
     for cluster in clusters:
@@ -149,30 +128,3 @@ def kmeans_microaggregation(data, k):
             cluster_length = len(clusters)
 
     return clusters, global_clusters_idx
-
-
-def main():
-    pd.options.mode.chained_assignment = None  # default='warn'
-    [records, sc, full_data] = read_data_normalized()
-    k = 25
-    n_clusters = len(records) // k
-    print("Maximum number of clusters: ", n_clusters)
-
-    groups, result_idx = kmeans_microaggregation(records, k)
-    print("Actual number of clusters: ", len(groups))
-
-    for i, gr in enumerate(groups):
-        print(i, ". group size: ", len(gr))
-
-    centroids = aggregate(groups)
-    print("centroids:", centroids)
-    RI = ResultInterpreter.Interpreter(groups, centroids, sc)
-    RI.set_full_groups(full_data, result_idx)
-    RI.print_group_analysis([3, 8, 2])
-    RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
-    RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
-    RI.calculate_homogeneity()
-
-
-if __name__ == "__main__":
-    main()

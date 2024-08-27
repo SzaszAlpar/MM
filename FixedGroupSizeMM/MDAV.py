@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
+from FixedGroupSizeMM import calculate_inf_loss
+
 
 def read_data_normalized():
     df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
@@ -82,7 +84,7 @@ def append_to_closest_group(records, groups, record_indices, indices):
 def MDAV(records, k):
     nn = len(records[0])
     RR = len(records)
-    print("Starting with {} records".format(RR))
+    # print("Starting with {} records".format(RR))
     groups = []
     indices = []  # To keep track of the indices
     record_indices = np.arange(RR)  # Create an array of record indices
@@ -104,7 +106,7 @@ def MDAV(records, k):
         record_indices = np.delete(record_indices, gr_ind2, 0)
 
         RR = len(records)
-        print("Remaining records, RR = ", RR)
+        # print("Remaining records, RR = ", RR)
 
     if RR > k:
         groups.append(records.copy())
@@ -137,5 +139,40 @@ def main():
     print("Cluster assignment array:", cluster_assignment)
 
 
+def main2():
+    dt_barcelona = '../Datasets/barcelona.csv'
+    dt_Census = '../Datasets/Census.csv'
+    dt_EIA = '../Datasets/EIA.csv'
+    dt_madrid = '../Datasets/madrid.csv'
+    dt_tarraco = '../Datasets/tarraco.csv'
+    dt_tarragona = '../Datasets/tarragona.csv'
+    datasets1 = [dt_madrid, dt_tarraco, dt_barcelona]
+    datasets2 = [dt_tarragona, dt_Census, dt_EIA]
+
+    for df in datasets1:
+        for k in range(3, 6):
+            print("working on dataset" + df)
+            print("k=", k)
+            records = calculate_inf_loss.read_dataset_wo_header(df)
+            groups, indices = MDAV(records, k)
+            cluster_assignment = np.zeros(len(records), dtype=int)
+            for cluster_id, record_indices in enumerate(indices):
+                for record_index in record_indices:
+                    cluster_assignment[record_index] = cluster_id
+            calculate_inf_loss.calculate_I_loss(records, cluster_assignment)
+
+    for df in datasets2:
+        for k in range(3, 6):
+            print("working on dataset" + df)
+            print("k=", k)
+            records = calculate_inf_loss.read_dataset(df)
+            groups, indices = MDAV(records, k)
+            cluster_assignment = np.zeros(len(records), dtype=int)
+            for cluster_id, record_indices in enumerate(indices):
+                for record_index in record_indices:
+                    cluster_assignment[record_index] = cluster_id
+            calculate_inf_loss.calculate_I_loss(records, cluster_assignment)
+
+
 if __name__ == "__main__":
-    main()
+    main2()

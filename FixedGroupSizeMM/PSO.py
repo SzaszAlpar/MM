@@ -1,10 +1,10 @@
-import random
-
+import numpy as np
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-import calculate_inf_loss
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import MinMaxScaler
+
+from FixedGroupSizeMM import calculate_inf_loss
 
 
 def read_testdata():
@@ -114,9 +114,10 @@ def PSO_standard(data, k, num_particles, max_iterations, c1, c2, num_dimensions,
     gBest_value = np.min(pBest_values)
     stagnation_threshold = 0.01
     improvement_threshold = 0.001
+    w = 0.72
 
     for iteration in range(max_iterations):
-        w = w_max - ((w_max - w_min) * iteration / max_iterations)
+        # w = w_max - ((w_max - w_min) * iteration / max_iterations)
         c1_dynamic = c1 + iteration / max_iterations * 0.5  # Increase c1 slightly over time
         c2_dynamic = c2 - iteration / max_iterations * 0.5  # Decrease c2 slightly over time
         # c1_dynamic = c1 - (iteration / max_iterations) * (c1 - 1.0)
@@ -174,36 +175,31 @@ def PSO_initalized_with_kmean(data, k, num_particles, max_iterations, c1, c2):
 
 def main():
     pd.options.mode.chained_assignment = None  # default='warn'
-
-    dataset_Census = '../Datasets/Census.csv'
+    dt_barcelona = '../Datasets/barcelona.csv'
+    dt_madrid = '../Datasets/madrid.csv'
+    dt_tarraco = '../Datasets/tarraco.csv'
     dt_tarragona = '../Datasets/tarragona.csv'
+    dataset_Census = '../Datasets/Census.csv'
+    dt_EIA = '../Datasets/EIA.csv'
+    datasets1 = [dt_barcelona, dt_madrid, dt_tarraco]
+    datasets2 = [dt_tarragona, dataset_Census, dt_EIA]
+    kx = [3, 4, 5]
 
-    k = 3
-    num_particles = 60
-    max_iterations = 400
-    c1 = 1.5  # Cognitive constant
-    c2 = 2.0  # Social constant
-    [gBest, gBest_value] = PSO([dt_tarragona, 1], k, num_particles, max_iterations, c1, c2)
+    for df in datasets1:
+        for k in kx:
+            # k = 5
+            print("working on" + df + " with k=", k)
+            num_particles = 50
+            max_iterations = 500
+            c1 = 1.49  # Cognitive constant
+            c2 = 1.49  # Social constant
+            [gBest, gBest_value] = PSO([df, 0], k, num_particles, max_iterations, c1, c2)
 
-    print("gbest value:", gBest_value)
+            print("gbest value:", gBest_value)
 
-    records = calculate_inf_loss.read_dataset(dt_tarragona)
-    group_assignments = assign_data_to_clusters(records, gBest, k)
-    calculate_inf_loss.calculate_I_loss(records, group_assignments)
-
-
-def main2():
-    max_iterations = 100
-    c1 = 1.5  # Cognitive constant
-    c2 = 2.5  # Social constant
-
-    for iteration in range(max_iterations):
-        # c1_dynamic = c1 - (iteration / max_iterations) * (c1 - 1.0)
-        # c2_dynamic = c2 + (iteration / max_iterations) * (2.0 - c2)
-        c1_dynamic = c1 + iteration / max_iterations * 0.5  # Increase c1 slightly over time
-        c2_dynamic = c2 - iteration / max_iterations * 0.5  # Decrease c2 slightly over tim
-        print("c1:,", c1_dynamic)
-        print("c2:,", c2_dynamic)
+            records = calculate_inf_loss.read_dataset_wo_header(df)
+            group_assignments = assign_data_to_clusters(records, gBest, k)
+            calculate_inf_loss.calculate_I_loss(records, group_assignments)
 
 
 if __name__ == "__main__":

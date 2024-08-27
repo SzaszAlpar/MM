@@ -1,24 +1,6 @@
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
 import random
-from FixedGroupSizeMM import ResultInterpreter
 
-
-def read_data_normalized():
-    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
-    df2 = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
-    scalers = {}
-    for column in column_names:
-        scaler = StandardScaler()
-        df2[column] = scaler.fit_transform(df2[column].to_numpy().reshape(-1, 1))
-        scalers[column] = scaler
-
-    df2 = df2.fillna(0).to_numpy()
-    return [df2, scalers, df.fillna(0).to_numpy()]
+import numpy as np
 
 
 def initialize_solution(n, k_min, k_max):
@@ -116,39 +98,3 @@ def simulated_annealing2(data, k_min, k_max, initial_temperature, cooling_rate, 
         temperature *= cooling_rate
 
     return best_solution, best_energy
-
-
-def main():
-    pd.options.mode.chained_assignment = None  # default='warn'
-    [records, sc, full_data] = read_data_normalized()
-    k_min = 20
-    k_max = 60
-    initial_temperature = 1000
-    cooling_rate = 0.99
-    max_iterations = 2000
-    min_energy_threshold = 1e-5  # Minimum energy threshold to avoid getting stuck
-    max_stagnation_iterations = 100  # Maximum iterations without significant improvement
-
-    best_solution, best_energy = simulated_annealing2(records, k_min, k_max, initial_temperature, cooling_rate,
-                                                      max_iterations, min_energy_threshold, max_stagnation_iterations)
-
-    print("Best Solution:", best_solution)
-    print("Best Energy:", best_energy)
-    interpret_result(best_solution, full_data, records, sc)
-
-
-def interpret_result(best_solution, full_data, records, sc):
-    centroids = ResultInterpreter.aggregate(records, best_solution)
-    groups = ResultInterpreter.get_groups(records, best_solution)
-    for i, gr in enumerate(groups):
-        print(i, ". group size: ", len(gr))
-    RI = ResultInterpreter.Interpreter(groups, centroids, sc)
-    RI.set_full_groups(full_data, best_solution)
-    RI.print_group_analysis([3, 8, 2])
-    RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
-    RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
-    RI.calculate_homogeneity()
-
-
-if __name__ == "__main__":
-    main()

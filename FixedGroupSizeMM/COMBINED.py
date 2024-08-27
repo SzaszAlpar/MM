@@ -1,28 +1,8 @@
 from FixedGroupSizeMM import MDAV
 import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
 from collections import defaultdict
-import GA, SA, PSO
-import calculate_inf_loss
-from VariableGroupSizeMM import VMDAV
-
-
-def read_testdata():
-    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
-    df = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-         'Daily Steps', ]]
-
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
-    scaler = StandardScaler()
-    for columnName in column_names:
-        scaled_data = scaler.fit_transform(df[columnName].to_numpy().reshape(-1, 1))
-        df[columnName] = scaled_data
-
-    df = df.fillna(0).to_numpy()
-    return df
+from FixedGroupSizeMM import GA, SA, PSO, calculate_inf_loss
+from VariableGroupSizeMM import PSO2, GA2, SA2
 
 
 def get_SSE(result, data):
@@ -115,10 +95,10 @@ def first_PSO_then_GA(dt_tuple, k, population_size, generations):
     else:
         records = calculate_inf_loss.read_dataset_wo_header(name)
 
-    num_particles = 50
-    max_iterations = 400
-    c1 = 1.5  # Cognitive constant
-    c2 = 2.5  # Social constant
+    num_particles = 15
+    max_iterations = 500
+    c1 = 1.49  # Cognitive constant
+    c2 = 1.49  # Social constant
     [gBest, gBest_value] = PSO.PSO(dt_tuple, k, num_particles, max_iterations, c1, c2)
     group_assignments = PSO.assign_data_to_clusters(records, gBest, k)
 
@@ -128,9 +108,8 @@ def first_PSO_then_GA(dt_tuple, k, population_size, generations):
     n_clusters = len(records) // k
     population = GA.initialize_population_with_given_value(population_size, len(records), n_clusters, k,
                                                            group_assignments)
-    best_solution, best_fitness = GA.boosted_genetic_algorithm(records, n_clusters, generations, k, population_size,population)
-
-    # print("GA is done, SSE value:", get_SSE(best_solution, records))
+    best_solution, best_fitness = GA.boosted_genetic_algorithm(records, n_clusters, generations, k, population_size,
+                                                               population)
 
     return best_solution
 
@@ -144,19 +123,20 @@ if __name__ == "__main__":
     dt_tarraco = '../Datasets/tarraco.csv'
 
     generations = 500
-    population_size = 50
+    population_size = 35
 
-    # datasets1 = [dt_madrid, dt_tarraco,dt_barcelona]
-    # datasets2 = [dt_tarragona,dt_Census,dt_EIA]
+    datasets1 = [dt_barcelona]
+    datasets2 = [dt_tarragona, dt_Census, dt_EIA]
+    kx = [3, 4, 5]
 
-
-
-    datasets1 = [dt_tarragona]
+    # datasets1 = [dt_tarragona]
     for dt in datasets1:
-        print("*** WORKING ON:", dt)
-        name_tuple = [dt, 1]
-        fa = first_PSO_then_GA(name_tuple, 5, population_size, generations)
-        # calculate_inf_loss.calculate_I_loss(records, fa)
+        for k in kx:
+            print("*** WORKING ON:", dt)
+            print("k=", k)
+            name_tuple = [dt, 0]
+            fa = first_PSO_then_GA(name_tuple, k, population_size, generations)
+            # calculate_inf_loss.calculate_I_loss(records, fa)
 
     # for dt in datasets2:
     #     print("*** WORKING ON:", dt)
@@ -170,5 +150,3 @@ if __name__ == "__main__":
     #     records = calculate_inf_loss.read_dataset(dt)
     #     fa = first_SA_then_GA(records, 3, population_size, generations)
     #     calculate_inf_loss.calculate_I_loss(records, fa)
-
-

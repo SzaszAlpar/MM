@@ -1,24 +1,4 @@
 import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from FixedGroupSizeMM import calculate_inf_loss
-
-
-def read_data_normalized():
-    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
-    df = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-         'Daily Steps', ]]
-
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
-    scaler = StandardScaler()
-    for columnName in column_names:
-        scaled_data = scaler.fit_transform(df[columnName].to_numpy().reshape(-1, 1))
-        df[columnName] = scaled_data
-
-    df = df.fillna(0).to_numpy()
-    return df
 
 
 def get_centroid(records, nn):
@@ -156,28 +136,3 @@ def V_MDAV(records, k):
         groups = append_to_closest_group(records, groups, record_indices, indices)
 
     return groups, indices
-
-
-def main():
-    records = read_data_normalized()
-    k = 31
-    groups, indices = V_MDAV(records, k)
-    print("groups len:", len(groups))
-    print("indices len:", len(indices))
-    print("type", type(groups[0]))
-    for group in groups:
-        print("group len:", len(group))
-
-    # Create an array to hold the cluster assignment for each record
-    cluster_assignment = np.zeros(len(records), dtype=int)
-
-    # Assign cluster labels
-    for cluster_id, record_indices in enumerate(indices):
-        for record_index in record_indices:
-            cluster_assignment[record_index] = cluster_id
-
-    print("Cluster assignment array:", cluster_assignment)
-
-
-if __name__ == "__main__":
-    main()

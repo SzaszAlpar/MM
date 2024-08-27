@@ -1,28 +1,10 @@
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-import ResultInterpreter
+
+from FixedGroupSizeMM import calculate_inf_loss
 
 
-def read_data_normalized():
-    df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
-    df2 = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
-
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
-    scalers = {}
-    for column in column_names:
-        scaler = StandardScaler()
-        df2[column] = scaler.fit_transform(df2[column].to_numpy().reshape(-1, 1))
-        scalers[column] = scaler
-
-    df2 = df2.fillna(0).to_numpy()
-    return [df2, scalers, df.fillna(0).to_numpy()]
-
-
-# we try to minimalize the inf loss
 def information_loss(clusters):
     loss = 0
     for cluster in clusters:
@@ -90,10 +72,6 @@ def kmeans_microaggregation(data, k):
     cluster_length = 0
 
     while len(clusters) < K:
-        print("############### Another iteration!\n")
-        print("clusters length: ", len(clusters))
-        for i, cluster in enumerate(clusters):
-            print(i, ". groups size", len(cluster))
         best_loss = float('inf')
         best_idx1 = None
         best_idx2 = None
@@ -132,7 +110,7 @@ def kmeans_microaggregation(data, k):
             elif len(new_clusters[0]) < k and len(new_clusters[1]) < k:
                 continue
             elif len(new_clusters[0]) >= k > len(new_clusters[1]):
-                print("CASE1")
+                # print("CASE1")
                 new_clusters[0], idx1, new_clusters[1], idx2 = (
                     keep_k_from_the_smallest_cluster(new_clusters[0], new_clusters[1], k, centroids[0], idx1, idx2))
 
@@ -147,7 +125,7 @@ def kmeans_microaggregation(data, k):
                     cl2 = idx + 1 if idx >= i else idx
 
             else:
-                print("CASE2")
+                # print("CASE2")
                 new_clusters[1], idx2, new_clusters[0], idx1 = (
                     keep_k_from_the_smallest_cluster(new_clusters[1], new_clusters[0], k, centroids[1], idx2, idx1))
                 if len(new_clusters[0]) >= k:
@@ -187,30 +165,36 @@ def kmeans_microaggregation(data, k):
     return clusters, global_clusters_idx
 
 
-def main():
-    pd.options.mode.chained_assignment = None  # default='warn'
-    [records, sc, full_data] = read_data_normalized()
-    k = 3
-    n_clusters = len(records) // k
-    print("Maximum number of clusters: ", n_clusters)
+def main2():
+    pd.options.mode.chained_assignment = None
 
-    groups, result_idx = kmeans_microaggregation(records, k)
-    print("Actual number of clusters: ", len(groups))
+    dt_barcelona = '../Datasets/barcelona.csv'
+    dt_Census = '../Datasets/Census.csv'
+    dt_EIA = '../Datasets/EIA.csv'
+    dt_madrid = '../Datasets/madrid.csv'
+    dt_tarraco = '../Datasets/tarraco.csv'
+    dt_tarragona = '../Datasets/tarragona.csv'
+    datasets1 = [dt_madrid, dt_tarraco, dt_barcelona]
+    datasets2 = [dt_tarragona, dt_Census, dt_EIA]
 
-    for i, gr in enumerate(groups):
-        print(i, ". group size: ", len(gr))
+    for p in range(3):
+        print(p, ". ITERATION")
+        for df in datasets1:
+            for k in range(3, 6):
+                print("working on dataset" + df)
+                print("k=", k)
+                records = calculate_inf_loss.read_dataset_wo_header(df)
+                groups, result_idx = kmeans_microaggregation(records, k)
+                calculate_inf_loss.calculate_I_loss(records, result_idx)
 
-    # ResultInterpreter.plot_some_results(result_idx)
-
-    centroids = aggregate(groups)
-    print("centroids:", centroids)
-    # RI = ResultInterpreter.Interpreter(groups, centroids, sc)
-    # RI.set_full_groups(full_data, result_idx)
-    # RI.print_group_analysis([3, 8, 2])
-    # RI.plot_two_column_of_centroids('Quality of Sleep', 'Stress Level')
-    # RI.plot_two_column_of_centroids('Physical Activity Level', 'Daily Steps')
-    # RI.calculate_homogeneity()
+        for df in datasets2:
+            for k in range(3, 6):
+                print("working on dataset" + df)
+                print("k=", k)
+                records = calculate_inf_loss.read_dataset(df)
+                groups, result_idx = kmeans_microaggregation(records, k)
+                calculate_inf_loss.calculate_I_loss(records, result_idx)
 
 
 if __name__ == "__main__":
-    main()
+    main2()

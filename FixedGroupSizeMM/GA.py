@@ -1,25 +1,10 @@
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
 import random
-import calculate_inf_loss, SA
 import time
 
+import numpy as np
+import pandas as pd
 
-def read_testdata():
-    df = pd.read_csv('Sleep_health_and_lifestyle_dataset.csv')
-    df2 = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate', 'Daily Steps']]
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
-    scalers = {}
-    for column in column_names:
-        scaler = StandardScaler()
-        df2[column] = scaler.fit_transform(df2[column].to_numpy().reshape(-1, 1))
-        scalers[column] = scaler
-
-    df2 = df2.fillna(0).to_numpy()
-    return df2
+from FixedGroupSizeMM import calculate_inf_loss
 
 
 def initialize_population(size, chromosome_length, n_clusters, k, records):
@@ -44,34 +29,8 @@ def initialize_population(size, chromosome_length, n_clusters, k, records):
     return population
 
 
-# def initialize_population_and_adjust_with_SA(size, chromosome_length, n_clusters, k, records):
-#     pop = initialize_population(size, chromosome_length, n_clusters, k, records)
-#     initial_temperature = 80
-#     cooling_rate = 0.85
-#     max_iterations = 500
-#     min_energy_threshold = 1e-5
-#     max_stagnation_iterations = 25
-#     first_half = size // 2
-#     new_pop = []
-#     for ch in pop[:first_half]:
-#         new_ch, fitness = SA.simulated_annealing22(records, k, initial_temperature, cooling_rate, max_iterations,
-#                                                    min_energy_threshold, max_stagnation_iterations, ch)
-#         print("fitness", fitness)
-#         new_pop.append(new_ch)
-#     return new_pop + pop[first_half + 1:]
-
-# def crossover(parent1, parent2, k, records, crossover_rate=0.90):
-#     if random.random() < crossover_rate:
-#         point = random.randint(1, len(parent1) - 2)
-#         child1 = np.concatenate((parent1[:point], parent2[point:]))
-#         child2 = np.concatenate((parent2[:point], parent1[point:]))
-#         child1 = rearrange_chromosome_distance_based(child1, k, records)
-#         child2 = rearrange_chromosome_distance_based(child2, k, records)
-#         return child1, child2
-#     return None, None
-
 def initialize_population_with_given_value(size, chromosome_length, n_clusters, k, given_value):
-    nr = int(size * 0.1)
+    nr = int(size * 0.2)
     population = []
     for j in range(nr):
         population.append(given_value)
@@ -101,18 +60,6 @@ def get_parent_number(population, parent_rate=0.60):
         return number + 1
     else:
         return number
-
-
-# def shuffle_top_population(population, fitnesses, shuffle_percentage):
-#     paired = list(zip(fitnesses, population))
-#     paired.sort(key=lambda x: x[0])
-#
-#     sorted_population = [ind for _, ind in paired[:]]
-#     num_to_shuffle = int(len(sorted_population) * shuffle_percentage)
-#     for idx in range(num_to_shuffle):
-#         np.random.shuffle(sorted_population[idx])
-#
-#     return sorted_population
 
 
 def shuffle_random_population(population, fitnesses, shuffle_percentage):
@@ -173,7 +120,7 @@ def tournament_selection(population, fitnesses, number_of_chromosomes, tournamen
     return selected_pop
 
 
-def uniform_crossover(parent1, parent2, k, records, crossover_rate=0.90, parent_rate=0.5):
+def uniform_crossover(parent1, parent2, k, records, crossover_rate=0.50, parent_rate=0.5):
     if random.random() < crossover_rate:
         child1 = []
         child2 = []
@@ -202,7 +149,7 @@ def rearrange_chromosome_randomly(chromosome, k, records):
     small_clusters = [cluster for cluster, count in cluster_counts.items() if count < k]
     big_clusters = [cluster for cluster, count in cluster_counts.items() if count > k]
 
-    while len(big_clusters) > 1 and len(small_clusters) > 0:
+    while len(big_clusters) >= 1 and len(small_clusters) > 0:
         big_cluster = max(big_clusters, key=lambda x: cluster_counts[x])
 
         while cluster_counts[big_cluster] > k and small_clusters:
@@ -268,7 +215,7 @@ def mutate(chromosome, records, curr_iteration, max_iteration):
 
 
 def genetic_algorithm(records, n_clusters, generations, k, population_size, population):
-    max_stagnation = 20
+    max_stagnation = 50
     shuffle_percentage = 0.3
     fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
     best_solution = population[np.argmin(fitnesses)]
@@ -276,7 +223,7 @@ def genetic_algorithm(records, n_clusters, generations, k, population_size, popu
     stagnation_count = 0
 
     for generation in range(generations):
-        print(generation, ". generation:")
+
         fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
 
         if min(fitnesses) < best_fitness:
@@ -304,10 +251,13 @@ def genetic_algorithm(records, n_clusters, generations, k, population_size, popu
 
         population.extend(offspring)
         new_fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
-        print("Generations fitnesses:", fitnesses)
+
         population = elitism_selection(population, new_fitnesses, population_size)
 
-        print("Current best fitness:", best_fitness)
+        if generation % 100 == 0:
+            print(generation, ". generation:")
+            print("Generations fitnesses:", fitnesses)
+            print("Current best fitness:", best_fitness)
 
     return best_solution, best_fitness
 
@@ -459,9 +409,8 @@ def mutate_distance_based(chromosome, records, curr_iteration, max_iteration):
     return chromosome
 
 
-
 def boosted_genetic_algorithm(records, n_clusters, generations, k, population_size, population):
-    max_stagnation = 20
+    max_stagnation = 50
     shuffle_percentage = 0.3
     fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
     best_solution = population[np.argmin(fitnesses)]
@@ -503,29 +452,67 @@ def boosted_genetic_algorithm(records, n_clusters, generations, k, population_si
             print("Generations fitnesses:", fitnesses)
             print("Current best fitness:", best_fitness)
 
-    calculate_inf_loss.calculate_I_loss(records,best_solution)
+    calculate_inf_loss.calculate_I_loss(records, best_solution)
 
     return best_solution, best_fitness
 
 
 def main():
     pd.options.mode.chained_assignment = None
-    records = read_testdata()
-    dataset_Census = '../Datasets/Census.csv'
-    # records = calculate_inf_loss.read_dataset(dataset_Census)
-    k = 3
-    population_size = 50
-    generations = 20
-    n_clusters = len(records) // k
-    n_samples = records.shape[0]
-    population = initialize_population(population_size, n_samples, n_clusters, k, records)
-    best_solution, best_fitness = boosted_genetic_algorithm(records, n_clusters, generations, k, population_size, population)
-    print("Best Fitness (SSE):", best_fitness)
 
-    overall_mean = np.mean(records, axis=0)
-    SST = np.sum((records - overall_mean) ** 2)
-    print("I= ", (best_fitness / SST) * 100)
-    calculate_inf_loss.calculate_I_loss(records, best_solution)
+    dt_barcelona = '../Datasets/barcelona.csv'
+    dt_Census = '../Datasets/Census.csv'
+    dt_EIA = '../Datasets/EIA.csv'
+    dt_madrid = '../Datasets/madrid.csv'
+    dt_tarraco = '../Datasets/tarraco.csv'
+    dt_tarragona = '../Datasets/tarragona.csv'
+    datasets1 = [dt_tarraco]
+    datasets2 = [dt_EIA, dt_Census, dt_tarragona]
+    for dt in datasets1:
+        print("*** WORKING ON:", dt)
+        records = calculate_inf_loss.read_dataset_wo_header(dt)
+        kx = [3, 4, 5]
+        for k in kx:
+            print("k=", k)
+            for i in range(1):
+                print(i, ". iteration: ")
+                population_size = 40
+                generations = 400
+                n_clusters = len(records) // k
+                n_samples = records.shape[0]
+                population = initialize_population(population_size, n_samples, n_clusters, k, records)
+                best_solution, best_fitness = boosted_genetic_algorithm(records, n_clusters, generations, k,
+                                                                        population_size, population)
+                # best_solution, best_fitness = genetic_algorithm(records, n_clusters, generations, k, population_size,
+                #                                                 population)
+                print("Best Fitness (SSE):", best_fitness)
+
+                overall_mean = np.mean(records, axis=0)
+                SST = np.sum((records - overall_mean) ** 2)
+                print("I= ", (best_fitness / SST) * 100)
+
+    for dt in datasets2:
+        print("*** WORKING ON:", dt)
+        records = calculate_inf_loss.read_dataset(dt)
+        kx = [3, 4, 5]
+        for k in kx:
+            print("k=", 3)
+            for i in range(1):
+                print(i, ". iteration: ")
+                population_size = 10
+                generations = 400
+                n_clusters = len(records) // k
+                n_samples = records.shape[0]
+                population = initialize_population(population_size, n_samples, n_clusters, k, records)
+                best_solution, best_fitness = boosted_genetic_algorithm(records, n_clusters, generations, k,
+                                                                        population_size, population)
+                # best_solution, best_fitness = genetic_algorithm(records, n_clusters, generations, k, population_size,
+                #                                                 population)
+                print("Best Fitness (SSE):", best_fitness)
+
+                overall_mean = np.mean(records, axis=0)
+                SST = np.sum((records - overall_mean) ** 2)
+                print("I= ", (best_fitness / SST) * 100)
 
 
 if __name__ == "__main__":

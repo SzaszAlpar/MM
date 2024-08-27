@@ -1,26 +1,8 @@
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from scipy.spatial.distance import euclidean
 from collections import defaultdict, deque
+
+import numpy as np
 from scipy.spatial import distance_matrix
-
-
-def read_data_normalized():
-    df = pd.read_csv('../FixedGroupSizeMM/Sleep_health_and_lifestyle_dataset.csv')
-    df = df[
-        ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-         'Daily Steps', ]]
-
-    column_names = ['Sleep Duration', 'Quality of Sleep', 'Physical Activity Level', 'Stress Level', 'Heart Rate',
-                    'Daily Steps']
-    scaler = StandardScaler()
-    for columnName in column_names:
-        scaled_data = scaler.fit_transform(df[columnName].to_numpy().reshape(-1, 1))
-        df[columnName] = scaled_data
-
-    df = df.fillna(0).to_numpy()
-    return df
+from scipy.spatial.distance import euclidean
 
 
 def get_k_nearest_neighbors(u, k, distance_matrix):
@@ -136,7 +118,7 @@ def decompose_component(component, k, adjacency_list):
         if s - phi >= k - 1:
             if phi >= k and s - phi >= k:
                 # megtartsuk a legnagyobb reszfat, a tobbi egy masik csoport
-                print("ELSO ESET")
+                # print("ELSO ESET")
                 new_component_1 = [largest_subtree_root]
                 queue = deque(tree[largest_subtree_root])
                 while queue:
@@ -148,7 +130,7 @@ def decompose_component(component, k, adjacency_list):
                 return [component, new_component_2]
             elif s - phi == k - 1:
                 # a legnagyobb reszfabol levagjuk a gyokeret, ezt a tobbivel egyutt csoportositjuk
-                print("MASODIK ESET")
+                # print("MASODIK ESET")
                 new_component_1 = []
                 queue = deque(tree[largest_subtree_root])
                 while queue:
@@ -160,7 +142,7 @@ def decompose_component(component, k, adjacency_list):
                 return [component, new_component_2]
             elif phi == k - 1:
                 # a legnagyobb reszfahoz hozzadjuk meg az alap fa gyokeret is
-                print("HARMADIK ESET")
+                # print("HARMADIK ESET")
                 new_component_1 = [u] + [largest_subtree_root]
                 queue = deque(tree[largest_subtree_root])
                 while queue:
@@ -173,7 +155,7 @@ def decompose_component(component, k, adjacency_list):
             else:
                 # amikor egyik reszfa sem mely, mindegyik el az alapfa gyokerehez huzodik
                 # addig vagunk le a levelekbol amig egy k meretu csoportot nem kapunk
-                print("NEGYEDIK ESET")
+                # print("NEGYEDIK ESET")
                 new_component_1 = []
                 queue = deque(tree[u])
                 size = 0
@@ -188,7 +170,7 @@ def decompose_component(component, k, adjacency_list):
         else:
             # ebben az esetben ujra kellene definialji a fat s az eleket
             # ritka eset, kicsi k-nak fordul elo
-            print("NINCS VAGAS")
+            # print("NINCS VAGAS")
             break
 
     return [component]
@@ -220,53 +202,3 @@ def run(data, n, k, adjacency_list, parents, distance_matrix):
             final_groups.append(remaining_group)
 
     return final_groups
-
-
-def main():
-    pd.options.mode.chained_assignment = None  # default='warn'
-    records = read_data_normalized()
-    k = 31
-    n = len(records)
-    adjacency_list = defaultdict(list)
-    parents = [-1] * n
-    dm = distance_matrix(records, records)
-
-    groups = run(records, n, k, adjacency_list, parents, dm)
-    for group in groups:
-        print("gr len:", len(group))
-
-    cluster_assignment = np.zeros(len(records), dtype=int)
-
-    # Assign cluster labels
-    for cluster_id, record_indices in enumerate(groups):
-        for record_index in record_indices:
-            cluster_assignment[record_index] = cluster_id
-
-    print("Cluster assignment array:", cluster_assignment)
-
-
-def main2():
-    data = np.array([
-        [1.0, 1.0],
-        [1.5, 1.5],
-        [2.0, 2.0],
-        [8.0, 8.0],
-        [8.5, 8.5],
-        [9.0, 9.0],
-        [1.0, 8.0],
-        [1.5, 8.5],
-        [2.0, 9.0],
-        [8.0, 1.0]
-    ])
-    n = len(data)
-    k = 3
-    adjacency_list = defaultdict(list)
-    parents = [-1] * n
-    dm = distance_matrix(data, data)
-    print(forest(n, k, adjacency_list, parents, dm))
-    print("adjency", adjacency_list)
-
-
-
-if __name__ == "__main__":
-    main()

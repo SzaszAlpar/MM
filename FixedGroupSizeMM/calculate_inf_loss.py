@@ -1,12 +1,14 @@
+import os
+import sys
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from FixedGroupSizeMM import MDAV, Kmean, GA, SA, PSO, COMBINED
-from VariableGroupSizeMM import VMDAV, VKmean, GA2, SA2, PSO2, Graphh, MDAV_graph
-import sys
-import os
-from collections import defaultdict
 from scipy.spatial import distance_matrix
+from sklearn.preprocessing import StandardScaler
+
+from FixedGroupSizeMM import MDAV, Kmean, GA, SA, PSO, COMBINED
+from VariableGroupSizeMM import VMDAV, VKmean, GA2, SA2, PSO2, Graphh
 
 
 def suppress_output():
@@ -117,16 +119,15 @@ def run_GA(kx, records):
         calculate_I_loss(records, cluster_assignment)
 
 
-# Ezt az algoritmust kell modositani, nem talal a visszateritatt fitness a kiszamolt SSE-vel (ugyanaz kellene legyen)
 def run_VGA(kx, records):
     for k in kx:
-        # suppress_output()
+        suppress_output()
         population_zise = 10
         generations = 15
 
         cluster_assignment, best_fitness = GA2.genetic_algorithm(records, generations, k, population_zise)
 
-        # restore_output()
+        restore_output()
 
         print("VGA, k=", k, ".\nReturned best fitness: ", best_fitness)
 
@@ -228,23 +229,12 @@ def run_GRAPH(kx, records):
         calculate_I_loss(records, cluster_assignment)
 
 
-def run_MDAV_GRAPH(kx, records):
-    for k in kx:
-        suppress_output()
-        cluster_assignment = MDAV_graph.MDAV_Graph(records, 60, k)
-        restore_output()
-
-        print("MDAV+GRAPH, k=", k)
-
-        calculate_I_loss(records, cluster_assignment)
-
-
 def run_MDAV_GA(kx, records):
     for k in kx:
         suppress_output()
         population_size = 10
         generations = 1000
-        cluster_assignment = MDAV_GA.MDAV_GA(records, 90, k, population_size, generations)
+        cluster_assignment = COMBINED.MDAV_GA(records, 90, k, population_size, generations)
         restore_output()
 
         print("MDAV+GA, k=", k)
@@ -279,48 +269,24 @@ def calculate_I_loss(data, result):
         else:
             cluster_counts[gene] = 1
     print("cluster counts:", cluster_counts)
-    # exit(0)
-
-
-def run_algorithms(k, records):
-    # run_MDAV(k, records)
-    run_VMDAV(k, records)
-    run_KMean(k, records)
-    run_VKMean(k, records)
-    run_GA(k, records)
-    # run_VGA(k,records)
-    run_SA(k, records)
-    run_VSA(k, records)
-    run_PSO(k, records)
-    run_VPSO(k, records)
-    run_GRAPH(k, records)
-    run_MDAV_GRAPH(k, records)
-    run_MDAV_GA(k, records)
 
 
 if __name__ == "__main__":
-    # k = [3, 4, 5, 6]
+    k = [3, 4, 5]
     dt_barcelona = '../Datasets/barcelona.csv'
-    # dt_Census = '../Datasets/Census.csv'
-    # dt_EIA = '../Datasets/EIA.csv'
+    dt_Census = '../Datasets/Census.csv'
+    dt_EIA = '../Datasets/EIA.csv'
     dt_madrid = '../Datasets/madrid.csv'
-    # dt_tarraco = '../Datasets/tarraco.csv'
+    dt_tarraco = '../Datasets/tarraco.csv'
     dt_tarragona = '../Datasets/tarragona.csv'
-    #
-    # datasets1 = [ dt_barcelona, dt_madrid, dt_tarraco]
-    # datasets2 = [dt_EIA, dt_Census, dt_tarragona]
-    # for dt in datasets1:
-    #     print("*** WORKING ON:", dt)
-    #     records = read_dataset_wo_header(dt)
-    #     # run_algorithms(k, records)
-    #     run_PSO(k, records)
-    #
-    # for dt in datasets2:
-    #     print("*** WORKING ON:", dt)
-    #     records = read_dataset(dt)
-    #     # run_algorithms(k, records)
-    #     run_PSO(k, records)
+    datasets1 = [dt_barcelona, dt_madrid, dt_tarraco]
+    datasets2 = [dt_EIA, dt_Census, dt_tarragona]
+    for dt in datasets1:
+        print("*** WORKING ON:", dt)
+        records = read_dataset_wo_header(dt)
+        run_VMDAV(k, records)
 
-    k = [3]
-    records = read_dataset_wo_header(dt_madrid)
-    run_MDAV(k, records)
+    for dt in datasets2:
+        print("*** WORKING ON:", dt)
+        records = read_dataset(dt)
+        run_VMDAV(k, records)
