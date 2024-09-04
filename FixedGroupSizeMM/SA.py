@@ -9,14 +9,14 @@ from FixedGroupSizeMM import calculate_inf_loss
 def initialize_solution(n, k):
     cluster_numbers = n // k
     solution = np.zeros(n, dtype=int)
-    cluster_sizes = [k] * (cluster_numbers)
+    cluster_sizes = [k] * cluster_numbers
 
-    # the remaining records will be added to a random group
-    cluster_sizes[random.choice(range(n // k))] += n % k
+    # The remaining records will be added to a random group
+    cluster_sizes[random.choice(range(cluster_numbers))] += n % k
 
     current_idx = 0
-    for cluster_id in range(1, cluster_numbers + 1):
-        for _ in range(cluster_sizes[cluster_id - 1]):
+    for cluster_id in range(cluster_numbers):
+        for _ in range(cluster_sizes[cluster_id]):
             solution[current_idx] = cluster_id
             current_idx += 1
 
@@ -118,9 +118,9 @@ def simulated_annealing2(data, k, initial_temperature, cooling_rate, max_iterati
             stagnation_counter = 0
 
         temperature *= cooling_rate
-        if iteration % 100 == 0:
-            print("iteration", iteration)
-            print("Current best energy:", best_energy)
+        # if iteration % 100 == 0:
+        #     print("iteration", iteration)
+        #     print("Current best energy:", best_energy)
 
     return best_solution, best_energy
 

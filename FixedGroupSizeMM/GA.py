@@ -76,7 +76,8 @@ def shuffle_random_population(population, fitnesses, shuffle_percentage):
 
 def fitness(chromosome, data, n_clusters):
     sse = 0
-    for i in range(n_clusters):
+    unique_groups = np.unique(chromosome)
+    for i in unique_groups:
         # we want to get all data points assigned to cluster i
         cluster = data[chromosome == i]
         if len(cluster) > 0:
@@ -281,22 +282,33 @@ def uniform_crossover_distance_based(parent1, parent2, k, records, crossover_rat
 
 
 def rearrange_chromosome_distance_based(chromosome, k, records):
-    cluster_counts = {}
+    n_clusters = len(records) // k
+
+    cluster_counts = {i: 0 for i in range(n_clusters)}
     for gene in chromosome:
-        if gene in cluster_counts:
-            cluster_counts[gene] += 1
-        else:
-            cluster_counts[gene] = 1
+        cluster_counts[gene] += 1
+
+    # print("len records", (cluster_counts))
+    unique_groups = np.unique(chromosome)
+    # print("unique count len", len(cluster_counts))
 
     small_clusters = [cluster for cluster, count in cluster_counts.items() if count < k]
     big_clusters = [cluster for cluster, count in cluster_counts.items() if count > k]
 
     while len(big_clusters) >= 1 and len(small_clusters) > 0:
         big_cluster = max(big_clusters, key=lambda x: cluster_counts[x])
+        # big_cluster = np.int64(big_cluster)
 
         while cluster_counts[big_cluster] > k and small_clusters:
             # small_cluster = small_clusters[0]
-            indices = np.where(chromosome == big_cluster)[0]
+            # print("big_cluster:",big_cluster)
+            chromosome_array = np.array(chromosome)
+            # print("where",np.where(chromosome_array == big_cluster))
+            # print("chromosome:", chromosome)
+
+            # indices = np.where(chromosome == big_cluster)[0]
+            indices = [index for index, elem in enumerate(chromosome) if elem == big_cluster]
+            # print("indices:", indices)
             random_index = random.choice(indices)
             small_cluster = get_closest_records_cluster(chromosome, small_clusters, random_index, records)
             chromosome[random_index] = small_cluster
@@ -322,8 +334,14 @@ def rearrange_chromosome_distance_based(chromosome, k, records):
 def get_closest_records_cluster(chromosome, small_clusters, big_cluster_index, records):
     small_cluster_values = []
     small_cluster_records = []
+    # print("small:", small_clusters)
     for cluster in small_clusters:
-        indices = np.where(chromosome == cluster)[0]
+        # cluster = np.int64(cluster)
+        # indices = np.where(chromosome == cluster)[0]
+        indices = [index for index, elem in enumerate(chromosome) if elem == cluster]
+        if len(indices) == 0:
+            indices.append(big_cluster_index)
+        # print("indices2 ", indices)
         for idx in indices:
             small_cluster_values.append(cluster)
             small_cluster_records.append(records[idx])
@@ -343,8 +361,10 @@ def rearrange_big_clusters_distance_based(chromosome, k, cluster_counts, big_clu
         for big_cluster in big_clusters:
             j = 0
             indices = arrange_records_in_cluster(chosen_cluster, big_cluster, chromosome, records)
+            # print("arranged indices:", indices)
             count = 0
             while cluster_counts[big_cluster] > k:
+                # print("indices[j] eseten j =", j)
                 chromosome[indices[j]] = chosen_cluster
                 j += 1
                 cluster_counts[big_cluster] -= 1
@@ -370,8 +390,10 @@ def get_cluster_with_smallest_sse(chromosome, big_clusters, records):
 
 
 def arrange_records_in_cluster(chosen_cluster, big_cluster, chromosome, records):
-    chosen_cluster_records = records[chromosome == chosen_cluster]
-    big_cluster_records = records[chromosome == big_cluster]
+    # chosen_cluster_records = records[chromosome == chosen_cluster]
+    chosen_cluster_records = [records[g] for g, gene in enumerate(chromosome) if gene == chosen_cluster]
+    # big_cluster_records = records[chromosome == big_cluster]
+    big_cluster_records = [records[g] for g, gene in enumerate(chromosome) if gene == big_cluster]
     centroid = np.average(chosen_cluster_records, axis=0)
     distances = np.linalg.norm(big_cluster_records - centroid, axis=1)
     indices = [i for i, gene in enumerate(chromosome) if gene == big_cluster]
@@ -393,13 +415,7 @@ def mutate_distance_based(chromosome, records, curr_iteration, max_iteration):
         closest_index = np.argmin(distances)
         swap_index = closest_index
         preferred_indices = np.where(chromosome == chromosome[closest_index])[0]
-        count = 0
         while swap_index == closest_index:
-            count += 1
-            if (count > 100):
-                print("preferred_indices", preferred_indices)
-                break
-
             swap_index = np.random.choice(preferred_indices)
 
         aux = chromosome[i]
@@ -407,6 +423,56 @@ def mutate_distance_based(chromosome, records, curr_iteration, max_iteration):
         chromosome[swap_index] = aux
 
     return chromosome
+
+
+def mutate_distance_based2(chromosome, records, curr_iteration, max_iteration):
+    start = 0.5
+    end = 0.01
+    mutation_rate = start - ((start - end) / max_iteration) * curr_iteration
+
+    if random.random() < mutation_rate:
+        # Kiszamoljuk minden klaszter centroidjat
+        unique_clusters = np.unique(chromosome)
+        centroids = {}
+
+        for cluster in unique_clusters:
+            cluster_indices = np.where(chromosome == cluster)[0]
+            cluster_records = records[cluster_indices]
+            centroids[cluster] = np.mean(cluster_records, axis=0)
+
+        # Meghat. azt a rekordot amely legtavolabbik a centroidjatol
+        farthest_distances = []
+        for i, cluster in enumerate(chromosome):
+            centroid = centroids[cluster]
+            distance = np.linalg.norm(records[i] - centroid)
+            farthest_distances.append((distance, i))
+
+        farthest_distances.sort(reverse=True)
+        farthest_index = farthest_distances[0][1]                           # ez lesz a gen ami felcserelodik
+
+        # Meghat. a klasztert amibe athelyezzuk
+        farthest_record = records[farthest_index]
+        closest_cluster = min(
+            unique_clusters,
+            key=lambda cluster: np.linalg.norm(farthest_record - centroids[cluster]) if cluster != chromosome[
+                farthest_index] else np.inf
+        )
+
+        # Meghat. az adott klaszter legrosszabb/legkulsobb elemet (ezzel csereljuk fel)
+        closest_cluster_indices = np.where(chromosome == closest_cluster)[0]
+        worst_index = max(
+            closest_cluster_indices,
+            key=lambda idx: np.linalg.norm(records[idx] - centroids[closest_cluster])
+        )
+
+        # Csere
+        aux = chromosome[farthest_index]
+        chromosome[farthest_index] = chromosome[worst_index]
+        chromosome[worst_index] = aux
+
+    return chromosome
+
+
 
 
 def boosted_genetic_algorithm(records, n_clusters, generations, k, population_size, population):
@@ -440,8 +506,8 @@ def boosted_genetic_algorithm(records, n_clusters, generations, k, population_si
             parent1, parent2 = parents[i], parents[i + 1]
             child1, child2 = uniform_crossover_distance_based(parent1, parent2, k, records)
             if child1 is not None and child2 is not None:
-                offspring.append(mutate_distance_based(child1, records, generation, generations))
-                offspring.append(mutate_distance_based(child2, records, generation, generations))
+                offspring.append(mutate_distance_based2(child1, records, generation, generations))
+                offspring.append(mutate_distance_based2(child2, records, generation, generations))
 
         population.extend(offspring)
         new_fitnesses = [fitness(chrom, records, n_clusters) for chrom in population]
@@ -466,41 +532,41 @@ def main():
     dt_madrid = '../Datasets/madrid.csv'
     dt_tarraco = '../Datasets/tarraco.csv'
     dt_tarragona = '../Datasets/tarragona.csv'
-    datasets1 = [dt_tarraco]
+    datasets1 = [dt_barcelona,dt_madrid,dt_tarraco]
     datasets2 = [dt_EIA, dt_Census, dt_tarragona]
-    for dt in datasets1:
-        print("*** WORKING ON:", dt)
-        records = calculate_inf_loss.read_dataset_wo_header(dt)
-        kx = [3, 4, 5]
-        for k in kx:
-            print("k=", k)
-            for i in range(1):
-                print(i, ". iteration: ")
-                population_size = 40
-                generations = 400
-                n_clusters = len(records) // k
-                n_samples = records.shape[0]
-                population = initialize_population(population_size, n_samples, n_clusters, k, records)
-                best_solution, best_fitness = boosted_genetic_algorithm(records, n_clusters, generations, k,
-                                                                        population_size, population)
-                # best_solution, best_fitness = genetic_algorithm(records, n_clusters, generations, k, population_size,
-                #                                                 population)
-                print("Best Fitness (SSE):", best_fitness)
-
-                overall_mean = np.mean(records, axis=0)
-                SST = np.sum((records - overall_mean) ** 2)
-                print("I= ", (best_fitness / SST) * 100)
+    # for dt in datasets1:
+    #     print("*** WORKING ON:", dt)
+    #     records = calculate_inf_loss.read_dataset_wo_header(dt)
+    #     kx = [3, 4, 5]
+    #     for k in kx:
+    #         print("k=", k)
+    #         for i in range(1):
+    #             print(i, ". iteration ")
+    #             population_size = 35
+    #             generations = 500
+    #             n_clusters = len(records) // k
+    #             n_samples = records.shape[0]
+    #             population = initialize_population(population_size, n_samples, n_clusters, k, records)
+    #             best_solution, best_fitness = boosted_genetic_algorithm(records, n_clusters, generations, k,
+    #                                                                     population_size, population)
+    #             # best_solution, best_fitness = genetic_algorithm(records, n_clusters, generations, k, population_size,
+    #             #                                                 population)
+    #             print("Best Fitness (SSE):", best_fitness)
+    #
+    #             overall_mean = np.mean(records, axis=0)
+    #             SST = np.sum((records - overall_mean) ** 2)
+    #             print("I= ", (best_fitness / SST) * 100)
 
     for dt in datasets2:
         print("*** WORKING ON:", dt)
         records = calculate_inf_loss.read_dataset(dt)
         kx = [3, 4, 5]
         for k in kx:
-            print("k=", 3)
+            print("k=", k)
             for i in range(1):
-                print(i, ". iteration: ")
-                population_size = 10
-                generations = 400
+                print(i, ". iteration ")
+                population_size = 35
+                generations = 500
                 n_clusters = len(records) // k
                 n_samples = records.shape[0]
                 population = initialize_population(population_size, n_samples, n_clusters, k, records)

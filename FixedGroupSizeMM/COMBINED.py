@@ -66,11 +66,11 @@ def first_MDAAV_then_GA(records, k, population_size, generations):
 
 
 def first_SA_then_GA(records, k, population_size, generations):
-    initial_temperature = 1000
-    cooling_rate = 0.99
-    max_iterations = 15000
+    initial_temperature = 45
+    cooling_rate = 0.90
+    max_iterations = 30000
     min_energy_threshold = 1e-5  # Minimum energy threshold to avoid getting stuck
-    max_stagnation_iterations = 100  # Maximum iterations without significant improvement
+    max_stagnation_iterations = 400  # Maximum iterations without significant improvement
 
     best_solution, best_energy = SA.simulated_annealing2(records, k, initial_temperature, cooling_rate,
                                                          max_iterations, min_energy_threshold,
@@ -81,7 +81,7 @@ def first_SA_then_GA(records, k, population_size, generations):
     n_clusters = len(records) // k
     population = GA.initialize_population_with_given_value(population_size, len(records), n_clusters, k,
                                                            best_solution)
-    best_solution, best_fitness = GA.genetic_algorithm(records, n_clusters, generations, k, population_size, population)
+    best_solution, best_fitness = GA.boosted_genetic_algorithm(records, n_clusters, generations, k, population_size, population)
 
     print("GA is done, SSE value:", get_SSE(best_solution, records))
 
@@ -125,28 +125,23 @@ if __name__ == "__main__":
     generations = 500
     population_size = 35
 
-    datasets1 = [dt_barcelona]
+    datasets1 = [dt_barcelona, dt_madrid, dt_tarraco]
     datasets2 = [dt_tarragona, dt_Census, dt_EIA]
     kx = [3, 4, 5]
 
-    # datasets1 = [dt_tarragona]
-    for dt in datasets1:
-        for k in kx:
+
+    # for k in kx:
+    #     for dt in datasets1:
+    #         print("*** WORKING ON:", dt)
+    #         print("working on k=",k)
+    #         records = calculate_inf_loss.read_dataset_wo_header(dt)
+    #         fa = first_SA_then_GA(records, k, population_size, generations)
+    #         calculate_inf_loss.calculate_I_loss(records, fa)
+
+    for k in kx:
+        for dt in datasets2:
             print("*** WORKING ON:", dt)
-            print("k=", k)
-            name_tuple = [dt, 0]
-            fa = first_PSO_then_GA(name_tuple, k, population_size, generations)
-            # calculate_inf_loss.calculate_I_loss(records, fa)
-
-    # for dt in datasets2:
-    #     print("*** WORKING ON:", dt)
-    #     # records = calculate_inf_loss.read_dataset(dt)
-    #     name_tuple = [dt, 0]
-    #     fa = first_PSO_then_GA(name_tuple, 3, population_size, generations)
-    #     # calculate_inf_loss.calculate_I_loss(records, fa)
-
-    # for dt in datasets2:
-    #     print("*** WORKING ON:", dt)
-    #     records = calculate_inf_loss.read_dataset(dt)
-    #     fa = first_SA_then_GA(records, 3, population_size, generations)
-    #     calculate_inf_loss.calculate_I_loss(records, fa)
+            print("working on k=",k)
+            records = calculate_inf_loss.read_dataset(dt)
+            fa = first_SA_then_GA(records, k, population_size, generations)
+            calculate_inf_loss.calculate_I_loss(records, fa)
